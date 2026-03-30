@@ -49,5 +49,8 @@ public class UtilisateurService {
     public boolean checkPassword(String rawPassword, String encodedPassword) {
         return passwordEncoder.matches(rawPassword, encodedPassword);
     }
+    public Utilisateur save(Utilisateur utilisateur) {
+    return utilisateurRepository.save(utilisateur);
+}
 
 }

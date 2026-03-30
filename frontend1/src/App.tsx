@@ -4,15 +4,14 @@ import { Footer } from './components/Footer';
 import { Home } from './pages/Home';
 import { JobListings } from './pages/JobListings';
 import { JobDetail } from './pages/JobDetail';
-// import { EmployerDashboard } from './pages/EmployerDashboard';
 import { CandidateDashboard } from './pages/CandidateDashboard';
-//import { HireTalentDashboard } from './pages/HireTalentDashboard';
 import { RecruiterDashboard } from './pages/RecruiterDashboard';
 import { PostJob } from './pages/PostJob';
 import { JobApplication } from './pages/JobApplication';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { ForgotPassword } from './pages/ForgotPassword';
+import { OfferCandidates } from './pages/OfferCandidates';
 
 type Page =
   | 'home'
@@ -28,7 +27,8 @@ type Page =
   | 'manage-jobs'
   | 'profile'
   | 'my-applications'
-  | 'saved-jobs';
+  | 'saved-jobs'
+  | 'offer-candidates';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
@@ -36,11 +36,9 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
 
-  // Vérifier si l'utilisateur est connecté au chargement
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const role = localStorage.getItem('authRole');
-    
     if (token && role) {
       setIsLoggedIn(true);
       setUserRole(role);
@@ -65,14 +63,11 @@ export default function App() {
   };
 
   const handleLoginSuccess = () => {
-  const role = localStorage.getItem('authRole');
-  setIsLoggedIn(true);
-  setUserRole(role);
-  
-  // ✅ Rediriger vers home après login
-  setCurrentPage('home');
-};
-
+    const role = localStorage.getItem('authRole');
+    setIsLoggedIn(true);
+    setUserRole(role);
+    setCurrentPage('home');
+  };
 
   const showNavbarAndFooter = !['login', 'signup', 'forgot-password'].includes(currentPage);
 
@@ -98,6 +93,11 @@ export default function App() {
         return <ForgotPassword onNavigate={handleNavigate} />;
       case 'post-job':
         return <PostJob onNavigate={handleNavigate} />;
+
+      // ✅ NEW: Offer Candidates page
+      case 'offer-candidates':
+        return <OfferCandidates offerId={selectedJobId} onNavigate={handleNavigate} />;
+
       case 'manage-jobs':
       case 'profile':
       case 'my-applications':
@@ -123,20 +123,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-    {showNavbarAndFooter && (
-  <Navbar 
-    isLoggedIn={isLoggedIn}
-    userRole={userRole}
-    currentPage={currentPage}
-    onNavigate={handleNavigate}
-    onLogout={handleLogout}
-  />
-)}
-
+      {showNavbarAndFooter && (
+        <Navbar
+          isLoggedIn={isLoggedIn}
+          userRole={userRole}
+          currentPage={currentPage}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )}
       <main className="flex-1">
         {renderPage()}
       </main>
-
       {showNavbarAndFooter && <Footer />}
     </div>
   );

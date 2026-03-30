@@ -1,5 +1,6 @@
 package com.recrutement.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,33 +9,34 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
-@Entity  // ← This makes it a database table
-@Table(name = "utilisateurs")  // ← Table name
-@Data  // ← Lombok: auto-generates getters/setters
-@NoArgsConstructor  // ← Auto-generates empty constructor
-@AllArgsConstructor  // ← Auto-generates constructor with all fields
+@Entity
+@Table(name = "utilisateurs")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Utilisateur {
 
-    @Id  // ← Primary key
-    @GeneratedValue(strategy = GenerationType.IDENTITY)  // ← Auto-increment
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)  // ← Email must be unique
+    @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)  // ← Password is required
+    @JsonIgnore
+    @Column(nullable = false)
     private String password;
 
     @Column(nullable = false)
     private String nom;
 
-    private String prenom;  // ← Optional field (no @Column)
+    private String prenom;
 
-    @Enumerated(EnumType.STRING)  // ← Store enum as text (not number)
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Role role;  // ← CANDIDAT, RECRUTEUR, or ADMIN
+    private Role role;
 
-    @CreationTimestamp  // ← Auto-fills with current date/time
-    @Column(updatable = false)  // ← Can't be changed after creation
+    @CreationTimestamp
+    @Column(updatable = false)
     private LocalDateTime createdAt;
 }

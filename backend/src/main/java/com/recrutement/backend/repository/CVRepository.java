@@ -9,13 +9,9 @@ import java.util.List;
 
 public interface CVRepository extends JpaRepository<CV, Long> {
 
-    // 🔍 Get all CVs uploaded by a candidate
     List<CV> findByCandidat(Utilisateur candidat);
 
-    // 🔍 Get all CVs submitted for a specific job offer
     List<CV> findByOffre(Offre offre);
 
-    // 🔍 Get CV submitted by a specific candidate for a specific offer
     List<CV> findByCandidatAndOffre(Utilisateur candidat, Offre offre);
-
 }

@@ -23,20 +23,30 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder; // ← inject it
 
     // REGISTER
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+ @PostMapping("/register")
+public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    try {
+        // Vérifier si l'email existe déjà
+        if (utilisateurService.findByEmail(request.getEmail()).isPresent()) {
+            return ResponseEntity.status(409).body("Email already exists");
+        }
 
-        Utilisateur utilisateur = new Utilisateur();
-        utilisateur.setNom(request.getNom());
-        utilisateur.setPrenom(request.getPrenom());
-        utilisateur.setEmail(request.getEmail());
-        utilisateur.setPassword(request.getPassword());
-        utilisateur.setRole(request.getRole());
+        // Créer l'objet Utilisateur
+        Utilisateur newUser = new Utilisateur();
+        newUser.setEmail(request.getEmail());
+        newUser.setPassword(request.getPassword()); // Note: Le mot de passe devrait être hashé !
+        newUser.setNom(request.getNom());
+        newUser.setPrenom(request.getPrenom());
+        newUser.setRole(request.getRole());
 
-        Utilisateur savedUser = utilisateurService.createUtilisateur(utilisateur);
+        // Sauvegarder
+        Utilisateur user = utilisateurService.createUtilisateur(newUser);
 
-        return ResponseEntity.ok("User registered successfully with ID: " + savedUser.getId());
+        return ResponseEntity.ok("User registered successfully");
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body("Registration failed: " + e.getMessage());
     }
+}
 
     // LOGIN
     @PostMapping("/login")

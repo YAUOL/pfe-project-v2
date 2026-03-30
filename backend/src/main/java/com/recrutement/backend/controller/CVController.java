@@ -1,18 +1,32 @@
 package com.recrutement.backend.controller;
 
 import com.recrutement.backend.model.CV;
+import com.recrutement.backend.model.MatchingScore;
 import com.recrutement.backend.model.Offre;
 import com.recrutement.backend.model.Utilisateur;
 import com.recrutement.backend.service.CVService;
+import com.recrutement.backend.service.MatchingScoreService;
 import com.recrutement.backend.service.OffreService;
 import com.recrutement.backend.service.UtilisateurService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/cv")
@@ -23,45 +37,44 @@ public class CVController {
     private final CVService cvService;
     private final OffreService offreService;
     private final UtilisateurService utilisateurService;
+    private final MatchingScoreService matchingScoreService;
 
-    // 📤 POST upload CV pour une offre
+    // ─────────────────────────────────────────────
+    // POST upload CV
+    // ─────────────────────────────────────────────
     @PostMapping("/upload")
     public ResponseEntity<?> uploadCV(
             @RequestParam("file") MultipartFile file,
             @RequestParam("offreId") Long offreId,
             Authentication authentication
     ) {
-
         try {
-
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body("File is empty");
             }
 
-            // Récupère l'email depuis le token JWT
             String email = authentication.getName();
-            System.out.println("🔍 [UPLOAD CV] Email from JWT: " + email);
-            
-            // Trouve l'utilisateur dans la base de données
             Utilisateur candidat = utilisateurService.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("User not found: " + email));
-            
-            System.out.println("✅ [UPLOAD CV] Utilisateur trouvé: " + candidat.getEmail());
 
-            // Get offer
             Offre offre = offreService.getOffreById(offreId);
-
             if (offre == null) {
                 return ResponseEntity.badRequest().body("Offer not found");
             }
 
-            // Save CV
             CV savedCV = cvService.uploadCV(file, candidat, offre);
 
-            return ResponseEntity.ok(savedCV);
+            // Auto-calculate matching score after upload
+            try {
+                matchingScoreService.calculateAndSave(savedCV.getId());
+                System.out.println("[UPLOAD] Score calculated for CV " + savedCV.getId());
+            } catch (Exception e) {
+                System.err.println("[UPLOAD] Score failed (non-blocking): " + e.getMessage());
+            }
+
+            return ResponseEntity.ok(convertCVToMap(savedCV));
 
         } catch (IllegalStateException e) {
-            // Duplicate application
             return ResponseEntity.status(409).body(e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
@@ -69,51 +82,228 @@ public class CVController {
         }
     }
 
-    // 📋 GET tous les CVs pour une offre (pour le recruteur)
+    // ─────────────────────────────────────────────
+    // GET CVs for an offer
+    // ─────────────────────────────────────────────
     @GetMapping("/offre/{offreId}")
     public ResponseEntity<?> getCVsByOffre(@PathVariable Long offreId) {
         try {
-            // Récupère l'offre
             Offre offre = offreService.getOffreById(offreId);
-            
             if (offre == null) {
                 return ResponseEntity.status(404).body("Offre not found");
             }
 
-            // Récupère tous les CVs pour cette offre
             List<CV> cvs = cvService.getCVsByOffre(offre);
-            
-            return ResponseEntity.ok(cvs);
-            
+            System.out.println("[GET CVs] Offre " + offreId + " → " + cvs.size() + " CVs found");
+
+            List<Map<String, Object>> result = cvs.stream()
+                    .map(this::convertCVToMap)
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(result);
+
         } catch (Exception e) {
+            System.err.println("[GET CVs] ERROR for offre " + offreId + ":");
+            e.printStackTrace();
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
 
-    // 👤 GET mes CVs (candidat connecté)
-    @GetMapping("/mes-cvs")
-    public ResponseEntity<?> getMesCVs(Authentication authentication) {
+    // ─────────────────────────────────────────────
+    // GET CVs with scores (sorted by score DESC)
+    // ─────────────────────────────────────────────
+    @GetMapping("/offre/{offreId}/with-scores")
+    public ResponseEntity<?> getCVsWithScores(@PathVariable Long offreId) {
         try {
-            // Récupère l'email depuis le token JWT
-            String email = authentication.getName();
-            System.out.println("🔍 [MES CVS] Recherche de l'utilisateur avec email: " + email);
-            
-            // Trouve l'utilisateur dans la base de données
-            Utilisateur candidat = utilisateurService.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found: " + email));
-            
-            System.out.println("✅ [MES CVS] Utilisateur trouvé: " + candidat.getEmail() + " - Role: " + candidat.getRole());
-            
-            // Récupère tous les CVs de ce candidat
-            List<CV> mesCVs = cvService.getCVsByCandidat(candidat);
-            
-            System.out.println("📋 [MES CVS] Nombre de CVs trouvés: " + mesCVs.size());
-            
-            return ResponseEntity.ok(mesCVs);
+            Offre offre = offreService.getOffreById(offreId);
+            if (offre == null) {
+                return ResponseEntity.status(404).body("Offre not found");
+            }
+
+            List<CV> cvs = cvService.getCVsByOffre(offre);
+            List<Map<String, Object>> result = new ArrayList<>();
+
+            for (CV cv : cvs) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("cv", convertCVToMap(cv));
+
+                Optional<MatchingScore> scoreOpt = matchingScoreService.getScoreByCv(cv);
+                if (scoreOpt.isPresent()) {
+                    MatchingScore ms = scoreOpt.get();
+                    Map<String, Object> scoreMap = new HashMap<>();
+                    scoreMap.put("id", ms.getId());
+                    scoreMap.put("score", ms.getScore());
+                    scoreMap.put("matchedSkills", ms.getMatchedSkills());
+                    scoreMap.put("missingSkills", ms.getMissingSkills());
+                    scoreMap.put("createdAt", ms.getCreatedAt() != null
+                            ? ms.getCreatedAt().toString() : null);
+                    item.put("matchingScore", scoreMap);
+                } else {
+                    item.put("matchingScore", null);
+                }
+
+                result.add(item);
+            }
+
+            // Sort by score DESC (nulls last)
+            result.sort((a, b) -> {
+                Object aScoreObj = a.get("matchingScore");
+                Object bScoreObj = b.get("matchingScore");
+                if (aScoreObj == null && bScoreObj == null) return 0;
+                if (aScoreObj == null) return 1;
+                if (bScoreObj == null) return -1;
+                BigDecimal aVal = (BigDecimal) ((Map<?, ?>) aScoreObj).get("score");
+                BigDecimal bVal = (BigDecimal) ((Map<?, ?>) bScoreObj).get("score");
+                return bVal.compareTo(aVal);
+            });
+
+            System.out.println("[WITH-SCORES] Offre " + offreId + " → " + result.size() + " CVs");
+            return ResponseEntity.ok(result);
+
         } catch (Exception e) {
-            System.out.println("❌ [MES CVS] Erreur: " + e.getMessage());
+            System.err.println("[WITH-SCORES] ERROR:");
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
+    }
+
+    // ─────────────────────────────────────────────
+    // GET mes CVs
+    // ─────────────────────────────────────────────
+    @GetMapping("/mes-cvs")
+    public ResponseEntity<?> getMesCVs(Authentication authentication) {
+        try {
+            String email = authentication.getName();
+            Utilisateur candidat = utilisateurService.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+            List<CV> mesCVs = cvService.getCVsByCandidat(candidat);
+            List<Map<String, Object>> result = mesCVs.stream()
+                    .map(this::convertCVToMap)
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // PUT update status
+    // ─────────────────────────────────────────────
+    @PutMapping("/{cvId}/status")
+    public ResponseEntity<?> updateStatus(
+            @PathVariable Long cvId,
+            @RequestBody Map<String, String> body
+    ) {
+        try {
+            CV cv = cvService.getCVById(cvId);
+            if (cv == null) {
+                return ResponseEntity.status(404).body("CV not found");
+            }
+
+            String statut = body.get("statut");
+            cv.setStatut(CV.StatutCandidature.valueOf(statut));
+            cvService.save(cv);
+
+            System.out.println("[STATUS] CV " + cvId + " → " + statut);
+            return ResponseEntity.ok("Status updated");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // POST re-extract text from CV file
+    // ─────────────────────────────────────────────
+    @PostMapping("/{cvId}/reextract")
+    public ResponseEntity<?> reExtractText(@PathVariable Long cvId) {
+        try {
+            CV cv = cvService.reExtractText(cvId);
+            System.out.println("[RE-EXTRACT] Done for CV " + cvId);
+            return ResponseEntity.ok(convertCVToMap(cv));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // GET download/view CV file
+    // ─────────────────────────────────────────────
+    @GetMapping("/{cvId}/file")
+    public ResponseEntity<Resource> downloadCVFile(@PathVariable Long cvId) {
+        try {
+            CV cv = cvService.getCVById(cvId);
+            if (cv == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Path filePath = Paths.get(cv.getCheminFichier());
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (!resource.exists()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            String fileName = cv.getNomFichier().toLowerCase();
+            MediaType mediaType;
+            if (fileName.endsWith(".pdf")) {
+                mediaType = MediaType.APPLICATION_PDF;
+            } else if (fileName.endsWith(".docx")) {
+                mediaType = MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                );
+            } else {
+                mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            }
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "inline; filename=\"" + cv.getNomFichier() + "\"")
+                    .body(resource);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // Helper: Convert CV to safe Map
+    // ─────────────────────────────────────────────
+    private Map<String, Object> convertCVToMap(CV cv) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", cv.getId());
+        map.put("nomFichier", cv.getNomFichier());
+        map.put("cheminFichier", cv.getCheminFichier());
+        map.put("texteExtrait", cv.getTexteExtrait());
+        map.put("uploadedAt", cv.getUploadedAt() != null
+                ? cv.getUploadedAt().toString() : null);
+        map.put("statut", cv.getStatut() != null
+                ? cv.getStatut().name() : "PENDING");
+
+        Map<String, Object> candidatMap = new HashMap<>();
+        if (cv.getCandidat() != null) {
+            candidatMap.put("id", cv.getCandidat().getId());
+            candidatMap.put("nom", cv.getCandidat().getNom());
+            candidatMap.put("prenom", cv.getCandidat().getPrenom());
+            candidatMap.put("email", cv.getCandidat().getEmail());
+        }
+        map.put("candidat", candidatMap);
+
+        Map<String, Object> offreMap = new HashMap<>();
+        if (cv.getOffre() != null) {
+            offreMap.put("id", cv.getOffre().getId());
+            offreMap.put("titre", cv.getOffre().getTitre());
+        }
+        map.put("offre", offreMap);
+
+        return map;
     }
 }

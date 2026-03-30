@@ -1,5 +1,6 @@
 package com.recrutement.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -27,13 +28,14 @@ public class Offre {
 
     private String localisation;
 
-    private String typeContrat; // CDI, CDD, Stage, Freelance
+    private String typeContrat;
 
     @Column(columnDefinition = "TEXT")
     private String competencesRequises;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recruteur_id")
+    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
     private Utilisateur recruteur;
 
     @Column(nullable = false)

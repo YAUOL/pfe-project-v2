@@ -1,11 +1,12 @@
 package com.recrutement.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,18 +20,31 @@ public class MatchingScore {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cv_id")
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "cv_id", nullable = false)
+    @JsonIgnoreProperties({"candidat", "offre", "texteExtrait",
+            "hibernateLazyInitializer", "handler"})
     private CV cv;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "offre_id")
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "offre_id", nullable = false)
+    @JsonIgnoreProperties({"recruteur", "hibernateLazyInitializer", "handler"})
     private Offre offre;
 
-    @Column(nullable = false)
-    private Double score; // Score entre 0.0 et 1.0
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal score;
 
-    @CreationTimestamp
-    @Column(updatable = false)
-    private LocalDateTime calculatedAt;
+    @Column(columnDefinition = "TEXT")
+    private String matchedSkills;
+
+    @Column(columnDefinition = "TEXT")
+    private String missingSkills;
+
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 }
