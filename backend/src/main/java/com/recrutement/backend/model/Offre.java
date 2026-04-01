@@ -1,47 +1,71 @@
 package com.recrutement.backend.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-
+import lombok.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "offres")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Offre {
-
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    
     @Column(nullable = false)
     private String titre;
-
+    
     @Column(columnDefinition = "TEXT")
     private String description;
-
+    
     private String localisation;
-
+    
+    @Column(name = "type_contrat")
     private String typeContrat;
-
-    @Column(columnDefinition = "TEXT")
+    
+    @Column(name = "competences_requises", columnDefinition = "TEXT")
     private String competencesRequises;
-
+    
+    @Column(nullable = false)
+    private Boolean active;
+    
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recruteur_id")
-    @JsonIgnoreProperties({"password", "hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "password"})
     private Utilisateur recruteur;
-
-    @Column(nullable = false)
-    private boolean active = true;
-
-    @CreationTimestamp
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
+    
+    @OneToMany(mappedBy = "offre", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties({"offre", "hibernateLazyInitializer", "handler"})
+    private List<CV> cvs;
+    
+    @OneToMany(mappedBy = "offre", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties({"offre", "hibernateLazyInitializer", "handler"})
+    private List<MatchingScore> matchingScores;
+    
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (active == null) {
+            active = true;
+        }
+        if (cvs == null) {
+            cvs = new ArrayList<>();
+        }
+        if (matchingScores == null) {
+            matchingScores = new ArrayList<>();
+        }
+    }
 }

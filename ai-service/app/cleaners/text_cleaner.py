@@ -13,15 +13,14 @@ OBJECTIF :
 Extraire et structurer les informations IMPORTANTES d’un CV pour le recrutement.
 
 GARDE UNIQUEMENT :
-- Compétences techniques (ex: Java, Python, React…)
-- Soft skills (ex: communication, teamwork…)
-- Expériences professionnelles (poste, entreprise, missions, dates)
-- Formation (diplômes, écoles, dates)
+- Compétences techniques 
+- Soft skills 
+- Expériences professionnelles 
+- Formation 
 - Langues
 - Certifications
 
 SUPPRIME :
-- Emails, numéros de téléphone, adresses
 - Symboles inutiles (•, -, *, etc.)
 - Texte répétitif ou vide
 - Paragraphes inutiles

@@ -342,7 +342,10 @@ export async function getMesOffres(): Promise<OffreDTO[]> {
   if (!token) throw new Error("You must be logged in");
 
   try {
-    const response = await fetch(`${API_BASE_URL}/offres/mes-offres`, {
+    // ✅ Get user profile to get recruteurId
+    const profile = await getMyProfile();
+    
+    const response = await fetch(`${API_BASE_URL}/offres/recruteur/${profile.id}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -389,25 +392,20 @@ export async function deleteOffre(offreId: number): Promise<void> {
 }
 
 export async function createOffre(
-  offre: Omit<OffreDTO, "id" | "active" | "createdAt">
+  offre: Omit<OffreDTO, "id" | "active" | "createdAt">,
+  recruteurId: number
 ): Promise<OffreDTO> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
 
   try {
-    // ✅ CORRECTION : Ajouter active: true par défaut
-    const offreWithDefaults = {
-      ...offre,
-      active: true
-    };
-
-    const response = await fetch(`${API_BASE_URL}/offres`, {
+    const response = await fetch(`${API_BASE_URL}/offres?recruteurId=${recruteurId}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(offreWithDefaults), // ✅ Utiliser offreWithDefaults
+      body: JSON.stringify(offre),
     });
 
     if (!response.ok) {

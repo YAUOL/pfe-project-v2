@@ -1,125 +1,215 @@
 package com.recrutement.backend.controller;
 
 import com.recrutement.backend.model.Offre;
-import com.recrutement.backend.model.Utilisateur;
 import com.recrutement.backend.service.OffreService;
-import com.recrutement.backend.service.UtilisateurService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/offres")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
+@Slf4j
+@CrossOrigin(origins = "*", maxAge = 3600)
 public class OffreController {
 
     private final OffreService offreService;
-    private final UtilisateurService utilisateurService;
 
-    // GET toutes les offres (public)
     @GetMapping
     public ResponseEntity<List<Offre>> getAllOffres() {
-        List<Offre> offres = offreService.getAllOffres();
-        return ResponseEntity.ok(offres);
-    }
-
-    // GET mes offres (recruteur connecté)
-    @GetMapping("/mes-offres")
-    public ResponseEntity<?> getMesOffres(Authentication authentication) {
+        log.info("📋 GET /api/offres");
         try {
-            // Récupérer l'email depuis le token JWT
-            String email = authentication.getName();
-            System.out.println("🔍 [MES OFFRES] Recherche recruteur avec email: " + email);
-            
-            // Trouver l'utilisateur dans la base de données
-            Utilisateur recruteur = utilisateurService.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("Recruteur not found: " + email));
-            
-            System.out.println("✅ [MES OFFRES] Recruteur trouvé: " + recruteur.getEmail());
-            
-            // Récupérer toutes les offres de ce recruteur
-            List<Offre> mesOffres = offreService.getOffresByRecruteur(recruteur);
-            
-            System.out.println("💼 [MES OFFRES] Nombre d'offres trouvées: " + mesOffres.size());
-            
-            return ResponseEntity.ok(mesOffres);
+            List<Offre> offres = offreService.getAllOffres();
+            return ResponseEntity.ok(offres);
         } catch (Exception e) {
-            System.out.println("❌ [MES OFFRES] Erreur: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
-    // GET une offre par ID
+    @GetMapping("/active")
+    public ResponseEntity<List<Offre>> getActiveOffres() {
+        log.info("✅ GET /api/offres/active");
+        try {
+            List<Offre> offres = offreService.getActiveOffres();
+            return ResponseEntity.ok(offres);
+        } catch (Exception e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<?> getOffreById(@PathVariable Long id) {
+        log.info("🔍 GET /api/offres/{}", id);
         try {
             Offre offre = offreService.getOffreById(id);
-            if (offre == null) {
-                return ResponseEntity.status(404).body("Offre not found");
-            }
             return ResponseEntity.ok(offre);
+        } catch (RuntimeException e) {
+            log.error("❌ Offre non trouvée");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse(e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur serveur"));
         }
     }
 
-    // POST créer une nouvelle offre
+    @GetMapping("/recruteur/{recruteurId}")
+    public ResponseEntity<?> getOffresByRecruteur(@PathVariable Long recruteurId) {
+        log.info("👤 GET /api/offres/recruteur/{}", recruteurId);
+        try {
+            List<Offre> offres = offreService.getOffresByRecruteur(recruteurId);
+            return ResponseEntity.ok(offres);
+        } catch (Exception e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur serveur"));
+        }
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<?> searchOffres(@RequestParam String keyword) {
+        log.info("🔎 GET /api/offres/search?keyword={}", keyword);
+        try {
+            List<Offre> offres = offreService.searchOffres(keyword);
+            return ResponseEntity.ok(offres);
+        } catch (Exception e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur serveur"));
+        }
+    }
+
     @PostMapping
-    public ResponseEntity<?> createOffre(@RequestBody Offre offre, Authentication authentication) {
+    @PreAuthorize("hasRole('RECRUTEUR')")
+    public ResponseEntity<?> createOffre(
+            @Valid @RequestBody Offre offre,
+            Authentication authentication) {
+        log.info("➕ POST /api/offres");
         try {
-            // Récupérer l'email depuis le token JWT
             String email = authentication.getName();
-            
-            // Trouver l'utilisateur dans la base de données
-            Utilisateur recruteur = utilisateurService.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("Recruteur not found: " + email));
-            
-            // Associer le recruteur à l'offre
-            offre.setRecruteur(recruteur);
-            
-            // Sauvegarder l'offre
-            Offre savedOffre = offreService.createOffre(offre);
-            
-            return ResponseEntity.ok(savedOffre);
+            Offre createdOffre = offreService.createOffre(offre, email);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdOffre);
+        } catch (RuntimeException e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(createErrorResponse(e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur serveur"));
         }
     }
 
-    // DELETE supprimer une offre
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteOffre(@PathVariable Long id, Authentication authentication) {
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('RECRUTEUR')")
+    public ResponseEntity<?> updateOffre(
+            @PathVariable Long id,
+            @Valid @RequestBody Offre offre) {
+        log.info("✏️ PUT /api/offres/{}", id);
         try {
-            // Récupérer l'email depuis le token JWT
-            String email = authentication.getName();
-            
-            // Trouver l'utilisateur dans la base de données
-            Utilisateur recruteur = utilisateurService.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("Recruteur not found: " + email));
-            
-            // Vérifier que l'offre existe et appartient au recruteur
-            Offre offre = offreService.getOffreById(id);
-            if (offre == null) {
-                return ResponseEntity.status(404).body("Offre not found");
-            }
-            
-            if (!offre.getRecruteur().getId().equals(recruteur.getId())) {
-                return ResponseEntity.status(403).body("You don't have permission to delete this offer");
-            }
-            
-            // Supprimer l'offre
-            offreService.deleteOffre(id);
-            
-            return ResponseEntity.ok("Offre deleted successfully");
+            Offre updatedOffre = offreService.updateOffre(id, offre);
+            return ResponseEntity.ok(updatedOffre);
+        } catch (RuntimeException e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse(e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur serveur"));
         }
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('RECRUTEUR') or hasRole('ADMIN')")
+    public ResponseEntity<?> deleteOffre(@PathVariable Long id) {
+        log.info("🗑️ DELETE /api/offres/{}", id);
+        try {
+            offreService.deleteOffre(id);
+            return ResponseEntity.ok(createSuccessResponse("Offre supprimée avec succès"));
+        } catch (RuntimeException e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse(e.getMessage()));
+        } catch (Exception e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur serveur: " + e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/{id}/toggle-status")
+    @PreAuthorize("hasRole('RECRUTEUR')")
+    public ResponseEntity<?> toggleOffreStatus(@PathVariable Long id) {
+        log.info("🔄 PATCH /api/offres/{}/toggle-status", id);
+        try {
+            Offre updatedOffre = offreService.toggleOffreStatus(id);
+            return ResponseEntity.ok(updatedOffre);
+        } catch (RuntimeException e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse(e.getMessage()));
+        } catch (Exception e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur serveur"));
+        }
+    }
+
+    @GetMapping("/count/recruteur/{recruteurId}")
+    @PreAuthorize("hasRole('RECRUTEUR') or hasRole('ADMIN')")
+    public ResponseEntity<?> countOffresByRecruteur(@PathVariable Long recruteurId) {
+        log.info("📊 GET /api/offres/count/recruteur/{}", recruteurId);
+        try {
+            long count = offreService.countOffresByRecruteur(recruteurId);
+            Map<String, Long> response = new HashMap<>();
+            response.put("count", count);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur serveur"));
+        }
+    }
+
+    @GetMapping("/count/active")
+    public ResponseEntity<?> countActiveOffres() {
+        log.info("📊 GET /api/offres/count/active");
+        try {
+            long count = offreService.countActiveOffres();
+            Map<String, Long> response = new HashMap<>();
+            response.put("count", count);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur serveur"));
+        }
+    }
+
+    private Map<String, Object> createSuccessResponse(String message) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", message);
+        return response;
+    }
+
+    private Map<String, Object> createErrorResponse(String message) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("error", message);
+        return response;
     }
 }

@@ -12,6 +12,7 @@ import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { OfferCandidates } from './pages/OfferCandidates';
+import { ProfileEdit } from './pages/ProfileEdit';
 
 type Page =
   | 'home'
@@ -26,6 +27,7 @@ type Page =
   | 'post-job'
   | 'manage-jobs'
   | 'profile'
+  | 'recruiter-profile'
   | 'my-applications'
   | 'saved-jobs'
   | 'offer-candidates';
@@ -75,31 +77,42 @@ export default function App() {
     switch (currentPage) {
       case 'home':
         return <Home onNavigate={handleNavigate} />;
+
       case 'job-listings':
         return <JobListings onNavigate={handleNavigate} />;
+
       case 'job-detail':
         return <JobDetail jobId={selectedJobId} onNavigate={handleNavigate} />;
+
       case 'employer-dashboard':
         return <RecruiterDashboard onNavigate={handleNavigate} />;
+
       case 'candidate-dashboard':
         return <CandidateDashboard onNavigate={handleNavigate} />;
+
       case 'job-application':
         return <JobApplication jobId={selectedJobId} onNavigate={handleNavigate} />;
+
       case 'login':
         return <Login onNavigate={handleNavigate} onLoginSuccess={handleLoginSuccess} />;
+
       case 'signup':
         return <Signup onNavigate={handleNavigate} />;
+
       case 'forgot-password':
         return <ForgotPassword onNavigate={handleNavigate} />;
+
       case 'post-job':
         return <PostJob onNavigate={handleNavigate} />;
 
-      // ✅ NEW: Offer Candidates page
       case 'offer-candidates':
         return <OfferCandidates offerId={selectedJobId} onNavigate={handleNavigate} />;
 
-      case 'manage-jobs':
       case 'profile':
+      case 'recruiter-profile':
+        return <ProfileEdit onNavigate={handleNavigate} />;
+
+      case 'manage-jobs':
       case 'my-applications':
       case 'saved-jobs':
         return (
@@ -116,6 +129,7 @@ export default function App() {
             </div>
           </div>
         );
+
       default:
         return <Home onNavigate={handleNavigate} />;
     }
