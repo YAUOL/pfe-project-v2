@@ -1,5 +1,15 @@
 import { DashboardSidebar } from '../components/DashboardSidebar';
-import { FileText, Bookmark, CheckCircle, XCircle, Clock, Mail, Phone, MapPin } from 'lucide-react';
+import {
+  FileText,
+  Bookmark,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Mail,
+  Briefcase,
+  TrendingUp,
+  Eye
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { useState, useEffect } from 'react';
@@ -15,7 +25,6 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState('');
 
-  // Charger les données au montage
   useEffect(() => {
     loadData();
   }, []);
@@ -23,22 +32,17 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
   const loadData = async () => {
     try {
       setLoading(true);
-      
-      // Récupérer l'email de l'utilisateur
+
       const email = localStorage.getItem('authEmail') || '';
       setUserEmail(email);
 
-      // Charger mes candidatures
       const mesCVs = await getMesCVs();
       console.log('📋 Mes CVs:', mesCVs);
       setApplications(mesCVs);
 
-      // Charger toutes les offres disponibles
       const offres = await getAllOffres();
       console.log('💼 Offres disponibles:', offres);
-      console.log('💼 Nombre d\'offres:', offres.length);
-      setAvailableJobs(offres.slice(0, 4)); // Limiter à 4
-
+      setAvailableJobs(offres.slice(0, 4));
     } catch (err) {
       console.error('❌ Failed to load data:', err);
     } finally {
@@ -46,29 +50,29 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusInfo = (status: string) => {
     switch (status) {
-      case 'Shortlisted':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'Rejected':
-        return <XCircle className="h-5 w-5 text-red-600" />;
+      case 'ACCEPTE':
+        return {
+          icon: <CheckCircle className="h-4 w-4 text-green-600" />,
+          color: 'bg-green-100 text-green-700',
+          label: 'Accepted',
+        };
+      case 'REFUSE':
+        return {
+          icon: <XCircle className="h-4 w-4 text-red-600" />,
+          color: 'bg-red-100 text-red-700',
+          label: 'Rejected',
+        };
       default:
-        return <Clock className="h-5 w-5 text-blue-600" />;
+        return {
+          icon: <Clock className="h-4 w-4 text-blue-600" />,
+          color: 'bg-blue-100 text-blue-700',
+          label: 'Under Review',
+        };
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Shortlisted':
-        return 'bg-green-100 text-green-700';
-      case 'Rejected':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-blue-100 text-blue-700';
-    }
-  };
-
-  // Extraire les initiales pour l'avatar
   const getInitials = (email: string) => {
     if (!email) return 'U';
     const parts = email.split('@')[0].split('.');
@@ -78,10 +82,24 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
     return email[0].toUpperCase();
   };
 
+  const acceptedCount = applications.filter(app => app.statut === 'ACCEPTE').length;
+  const rejectedCount = applications.filter(app => app.statut === 'REFUSE').length;
+  const pendingCount = applications.filter(
+    app => app.statut !== 'ACCEPTE' && app.statut !== 'REFUSE'
+  ).length;
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Loading dashboard...</p>
+      <div className="flex">
+        <DashboardSidebar
+          userType="candidate"
+          activePage="candidate-dashboard"
+          onNavigate={onNavigate}
+          onLogout={() => onNavigate('home')}
+        />
+        <main className="flex-1 bg-surface min-h-screen flex items-center justify-center">
+          <p>Loading dashboard...</p>
+        </main>
       </div>
     );
   }
@@ -100,112 +118,156 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
           {/* Header */}
           <div className="mb-8">
             <h1 className="mb-2">Candidate Dashboard</h1>
-            <p className="text-secondary">Track your applications and manage your profile</p>
+            <p className="text-secondary">Track your applications and discover new opportunities</p>
           </div>
 
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-xl border border-color p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-primary" />
+                </div>
+                <TrendingUp className="h-5 w-5 text-green-500" />
+              </div>
+              <h3 className="text-3xl font-bold mb-1">{applications.length}</h3>
+              <p className="text-secondary text-sm">Total Applications</p>
+            </div>
+
+            <div className="bg-white rounded-xl border border-color p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-yellow-600" />
+                </div>
+                <TrendingUp className="h-5 w-5 text-green-500" />
+              </div>
+              <h3 className="text-3xl font-bold mb-1">{pendingCount}</h3>
+              <p className="text-secondary text-sm">Under Review</p>
+            </div>
+
+            <div className="bg-white rounded-xl border border-color p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+                <TrendingUp className="h-5 w-5 text-green-500" />
+              </div>
+              <h3 className="text-3xl font-bold mb-1">{acceptedCount}</h3>
+              <p className="text-secondary text-sm">Accepted</p>
+            </div>
+
+            <div className="bg-white rounded-xl border border-color p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Bookmark className="h-6 w-6 text-purple-600" />
+                </div>
+                <span className="text-sm font-medium text-primary">Open</span>
+              </div>
+              <h3 className="text-3xl font-bold mb-1">{availableJobs.length}</h3>
+              <p className="text-secondary text-sm">Available Jobs</p>
+            </div>
+          </div>
+
+          {/* My Applications */}
+          <div className="bg-white rounded-xl border border-color p-6 mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+              <div>
+                <h2 className="mb-1">My Applications</h2>
+                <p className="text-secondary text-sm">Manage and track your submitted applications</p>
+              </div>
+              <Button
+                onClick={() => onNavigate('job-listings')}
+                className="bg-primary hover:bg-primary-hover text-white rounded-lg"
+              >
+                <Briefcase className="h-4 w-4 mr-2" />
+                Browse Jobs
+              </Button>
+            </div>
+
+            {applications.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="h-12 w-12 text-muted mx-auto mb-4" />
+                <p className="text-secondary mb-4">You haven't applied to any jobs yet</p>
+                <Button
+                  className="bg-primary hover:bg-primary-hover text-white rounded-lg"
+                  onClick={() => onNavigate('job-listings')}
+                >
+                  Explore Opportunities
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-color">
+                      <th className="text-left py-3 px-2 text-sm font-medium text-secondary">Job Title</th>
+                      <th className="text-left py-3 px-2 text-sm font-medium text-secondary">CV File</th>
+                      <th className="text-left py-3 px-2 text-sm font-medium text-secondary">Status</th>
+                      <th className="text-left py-3 px-2 text-sm font-medium text-secondary">Applied Date</th>
+                      <th className="text-right py-3 px-2 text-sm font-medium text-secondary">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {applications.map((application) => {
+                      const status = getStatusInfo(application.statut);
+
+                      return (
+                        <tr key={application.id} className="border-b border-color last:border-0">
+                          <td className="py-4 px-2 font-medium">{application.offre.titre}</td>
+                          <td className="py-4 px-2 text-secondary">{application.nomFichier}</td>
+                          <td className="py-4 px-2">
+                            <Badge className={`${status.color} border-0 flex items-center gap-1 w-fit`}>
+                              {status.icon}
+                              {status.label}
+                            </Badge>
+                          </td>
+                          <td className="py-4 px-2 text-secondary">
+                            {new Date(application.uploadedAt).toLocaleDateString()}
+                          </td>
+                          <td className="py-4 px-2 text-right">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg"
+                              onClick={() => onNavigate('job-detail', application.offre.id.toString())}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Job
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Available Jobs + Profile/Quick Actions */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-8">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white rounded-xl border border-color p-6">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                    <FileText className="h-6 w-6 text-primary" />
-                  </div>
-                  <h3 className="text-3xl font-bold mb-1">{applications.length}</h3>
-                  <p className="text-secondary text-sm">Applications</p>
-                </div>
-
-                <div className="bg-white rounded-xl border border-color p-6">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
-                  <h3 className="text-3xl font-bold mb-1">{applications.length}</h3>
-                  <p className="text-secondary text-sm">Under Review</p>
-                </div>
-
-                <div className="bg-white rounded-xl border border-color p-6">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                    <Bookmark className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <h3 className="text-3xl font-bold mb-1">{availableJobs.length}</h3>
-                  <p className="text-secondary text-sm">Available Jobs</p>
-                </div>
-              </div>
-
-              {/* Application Status */}
+            {/* Available Jobs */}
+            <div className="lg:col-span-2">
               <div className="bg-white rounded-xl border border-color p-6">
-                <h2 className="mb-6">My Applications</h2>
-                {applications.length === 0 ? (
-                  <div className="text-center py-12">
-                    <FileText className="h-12 w-12 text-muted mx-auto mb-4" />
-                    <p className="text-secondary mb-4">You haven't applied to any jobs yet</p>
-                    <Button 
-                      className="bg-primary hover:bg-primary-hover text-white rounded-lg"
-                      onClick={() => onNavigate('job-listings')}
-                    >
-                      Browse Jobs
-                    </Button>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                  <div>
+                    <h2 className="mb-1">Available Jobs</h2>
+                    <p className="text-secondary text-sm">Latest opportunities you can apply for</p>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {applications.map((application) => (
-                      <div 
-                        key={application.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface rounded-lg gap-4"
-                      >
-                        <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center flex-shrink-0">
-                            {getStatusIcon('Under Review')}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="mb-1">{application.offre.titre}</h4>
-                            <p className="text-sm text-secondary mb-2">
-                              CV: {application.nomFichier}
-                            </p>
-                            <p className="text-xs text-muted">
-                              Applied on {new Date(application.uploadedAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 sm:flex-col sm:items-end">
-                          <Badge className={`${getStatusColor('Under Review')} border-0`}>
-                            Under Review
-                          </Badge>
-                          <Button 
-                            variant="outline"
-                            size="sm"
-                            className="rounded-lg border-color"
-                            onClick={() => onNavigate('job-detail', application.offre.id.toString())}
-                          >
-                            View Job
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Available Jobs */}
-              <div className="bg-white rounded-xl border border-color p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2>Available Jobs</h2>
-                  <Button 
-                    variant="ghost"
-                    size="sm"
+                  <Button
+                    variant="outline"
+                    className="rounded-lg"
                     onClick={() => onNavigate('job-listings')}
-                    className="text-primary hover:text-primary-hover"
                   >
-                    View All
+                    View All Jobs
                   </Button>
                 </div>
-                
+
                 {availableJobs.length === 0 ? (
                   <div className="text-center py-12">
                     <Bookmark className="h-12 w-12 text-muted mx-auto mb-4" />
                     <p className="text-secondary mb-4">No jobs available at the moment</p>
-                    <Button 
+                    <Button
                       className="bg-primary hover:bg-primary-hover text-white rounded-lg"
                       onClick={() => onNavigate('job-listings')}
                     >
@@ -215,29 +277,35 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
                 ) : (
                   <div className="space-y-4">
                     {availableJobs.map((job) => (
-                      <div 
+                      <div
                         key={job.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface rounded-lg gap-4 hover:bg-primary-light/50 transition-colors cursor-pointer"
-                        onClick={() => onNavigate('job-detail', job.id.toString())}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface rounded-lg gap-4 hover:bg-primary-light/50 transition-colors"
                       >
                         <div className="flex-1">
                           <h4 className="mb-1">{job.titre}</h4>
-                          <p className="text-sm text-secondary mb-2">{job.localisation}</p>
+                          <p className="text-sm text-secondary mb-2">{job.description}</p>
                           <div className="flex flex-wrap gap-2 text-xs text-muted">
                             <span>{job.localisation}</span>
                             <span>•</span>
                             <span>{job.typeContrat}</span>
                           </div>
                         </div>
-                        <Button 
-                          className="bg-primary hover:bg-primary-hover text-white rounded-lg whitespace-nowrap"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onNavigate('job-application', job.id.toString());
-                          }}
-                        >
-                          Apply Now
-                        </Button>
+
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="rounded-lg"
+                            onClick={() => onNavigate('job-detail', job.id.toString())}
+                          >
+                            View
+                          </Button>
+                          <Button
+                            className="bg-primary hover:bg-primary-hover text-white rounded-lg"
+                            onClick={() => onNavigate('job-application', job.id.toString())}
+                          >
+                            Apply Now
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -255,7 +323,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
                       {getInitials(userEmail)}
                     </span>
                   </div>
-                  <h3 className="mb-1">{userEmail.split('@')[0]}</h3>
+                  <h3 className="mb-1">{userEmail.split('@')[0] || 'Candidate'}</h3>
                   <p className="text-secondary text-sm mb-4">Candidate</p>
                   <Badge className="bg-green-100 text-green-700 border-0">
                     Active
@@ -271,9 +339,13 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
                     <FileText className="h-4 w-4 mr-2 text-primary" />
                     {applications.length} Application{applications.length !== 1 ? 's' : ''}
                   </div>
+                  <div className="flex items-center text-sm text-secondary">
+                    <Bookmark className="h-4 w-4 mr-2 text-primary" />
+                    {availableJobs.length} Available Job{availableJobs.length !== 1 ? 's' : ''}
+                  </div>
                 </div>
 
-                <Button 
+                <Button
                   variant="outline"
                   className="w-full border-color rounded-lg"
                   onClick={() => onNavigate('profile')}
@@ -286,15 +358,15 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
               <div className="bg-white rounded-xl border border-color p-6">
                 <h3 className="mb-4">Quick Actions</h3>
                 <div className="space-y-3">
-                  <Button 
+                  <Button
                     variant="outline"
                     className="w-full justify-start border-color rounded-lg hover:bg-primary-light hover:border-primary"
                     onClick={() => onNavigate('job-listings')}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
+                    <Briefcase className="h-4 w-4 mr-2" />
                     Browse Jobs
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
                     className="w-full justify-start border-color rounded-lg hover:bg-primary-light hover:border-primary"
                     onClick={() => onNavigate('my-applications')}
@@ -302,7 +374,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
                     <CheckCircle className="h-4 w-4 mr-2" />
                     My Applications
                   </Button>
-                  <Button 
+                  <Button
                     variant="outline"
                     className="w-full justify-start border-color rounded-lg hover:bg-primary-light hover:border-primary"
                     onClick={() => onNavigate('saved-jobs')}
@@ -313,21 +385,21 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
                 </div>
               </div>
 
-              {/* Tips */}
+              {/* Summary Card */}
               <div className="bg-primary-light rounded-xl p-6">
-                <h3 className="mb-3 text-primary">Application Tips</h3>
+                <h3 className="mb-3 text-primary">Application Summary</h3>
                 <ul className="space-y-2 text-sm text-secondary">
                   <li className="flex items-start">
-                    <CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 flex-shrink-0" />
-                    Tailor your CV to each position
+                    <Clock className="h-4 w-4 mr-2 text-primary mt-0.5 flex-shrink-0" />
+                    {pendingCount} application{pendingCount !== 1 ? 's' : ''} under review
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 flex-shrink-0" />
-                    Write compelling cover letters
+                    {acceptedCount} accepted application{acceptedCount !== 1 ? 's' : ''}
                   </li>
                   <li className="flex items-start">
-                    <CheckCircle className="h-4 w-4 mr-2 text-primary mt-0.5 flex-shrink-0" />
-                    Follow up on your applications
+                    <XCircle className="h-4 w-4 mr-2 text-primary mt-0.5 flex-shrink-0" />
+                    {rejectedCount} rejected application{rejectedCount !== 1 ? 's' : ''}
                   </li>
                 </ul>
               </div>

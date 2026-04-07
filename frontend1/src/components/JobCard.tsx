@@ -1,10 +1,24 @@
 import { MapPin, DollarSign, Briefcase, Clock, Bookmark } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Job } from '../lib/mockData';
+
+export interface JobCardData {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  salaryRange: string;
+  type: string;
+  postedDate: string;
+  description: string;
+  skills: string[];
+  category: string;
+  experienceLevel: string;
+  featured: boolean;
+}
 
 interface JobCardProps {
-  job: Job;
+  job: JobCardData;
   onViewDetails: (jobId: string) => void;
   variant?: 'default' | 'compact';
 }
@@ -16,7 +30,7 @@ export function JobCard({ job, onViewDetails, variant = 'default' }: JobCardProp
         <div className="flex-1">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h3 
+              <h3
                 className="text-xl font-semibold mb-2 group-hover:text-primary transition-colors"
                 onClick={() => onViewDetails(job.id)}
               >
@@ -53,8 +67,8 @@ export function JobCard({ job, onViewDetails, variant = 'default' }: JobCardProp
           {variant === 'default' && (
             <div className="flex flex-wrap gap-2 mb-4">
               {job.skills.slice(0, 3).map((skill, index) => (
-                <Badge 
-                  key={index} 
+                <Badge
+                  key={index}
                   variant="secondary"
                   className="bg-surface text-secondary border-0"
                 >
@@ -62,7 +76,7 @@ export function JobCard({ job, onViewDetails, variant = 'default' }: JobCardProp
                 </Badge>
               ))}
               {job.skills.length > 3 && (
-                <Badge 
+                <Badge
                   variant="secondary"
                   className="bg-surface text-secondary border-0"
                 >
@@ -75,13 +89,13 @@ export function JobCard({ job, onViewDetails, variant = 'default' }: JobCardProp
       </div>
 
       <div className="flex items-center gap-3 mt-auto">
-        <Button 
+        <Button
           className="flex-1 bg-primary hover:bg-primary-hover text-white rounded-lg"
           onClick={() => onViewDetails(job.id)}
         >
           View Details
         </Button>
-        <Button 
+        <Button
           variant="outline"
           size="icon"
           className="rounded-lg border-color hover:bg-primary-light hover:border-primary"

@@ -12,6 +12,11 @@ public class OffreDTO {
     private String localisation;
     private String typeContrat;
     private String competencesRequises;
+    private String company;
+    private String category;
+    private String experienceLevel;
+    private Integer salaryMin;
+    private Integer salaryMax;
     private boolean active;
     private LocalDateTime createdAt;
 }

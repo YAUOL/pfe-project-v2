@@ -1,5 +1,5 @@
 import { Button } from './ui/button';
-import { Home, FileText, User, LogOut, Briefcase } from 'lucide-react';
+import { Home, FileText, User, LogOut, Briefcase, ShieldCheck } from 'lucide-react';
 
 interface NavbarProps {
   isLoggedIn: boolean;
@@ -9,8 +9,13 @@ interface NavbarProps {
   onLogout: () => void;
 }
 
-export function Navbar({ isLoggedIn, userRole, currentPage, onNavigate, onLogout }: NavbarProps) {
-  
+export function Navbar({
+  isLoggedIn,
+  userRole,
+  currentPage,
+  onNavigate,
+  onLogout,
+}: NavbarProps) {
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('authEmail');
@@ -22,12 +27,37 @@ export function Navbar({ isLoggedIn, userRole, currentPage, onNavigate, onLogout
     return currentPage === page;
   };
 
+  const getDashboardPage = () => {
+    if (userRole === 'ADMIN') return 'admin-dashboard';
+    if (userRole === 'RECRUTEUR') return 'employer-dashboard';
+    return 'candidate-dashboard';
+  };
+
+  const getProfilePage = () => {
+    if (userRole === 'RECRUTEUR') return 'recruiter-profile';
+    return 'profile';
+  };
+
+  const getRoleLabel = () => {
+    if (userRole === 'ADMIN') return 'Admin';
+    if (userRole === 'RECRUTEUR') return 'Recruiter';
+    return 'Candidate';
+  };
+
+  const isDashboardActive = () => {
+    return (
+      isActive('admin-dashboard') ||
+      isActive('employer-dashboard') ||
+      isActive('candidate-dashboard')
+    );
+  };
+
   return (
     <nav className="bg-white border-b border-color sticky top-0 z-50 shadow-custom-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <div 
+          <div
             className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
             onClick={() => onNavigate('home')}
           >
@@ -58,10 +88,16 @@ export function Navbar({ isLoggedIn, userRole, currentPage, onNavigate, onLogout
             {isLoggedIn && (
               <>
                 <NavLink
-                  icon={<FileText className="h-4 w-4" />}
+                  icon={
+                    userRole === 'ADMIN' ? (
+                      <ShieldCheck className="h-4 w-4" />
+                    ) : (
+                      <FileText className="h-4 w-4" />
+                    )
+                  }
                   label="Dashboard"
-                  onClick={() => onNavigate(userRole === 'RECRUTEUR' ? 'employer-dashboard' : 'candidate-dashboard')}
-                  isActive={isActive('employer-dashboard') || isActive('candidate-dashboard')}
+                  onClick={() => onNavigate(getDashboardPage())}
+                  isActive={isDashboardActive()}
                 />
 
                 {userRole === 'RECRUTEUR' && (
@@ -73,12 +109,14 @@ export function Navbar({ isLoggedIn, userRole, currentPage, onNavigate, onLogout
                   />
                 )}
 
-                <NavLink
-                  icon={<User className="h-4 w-4" />}
-                  label="Profile"
-                  onClick={() => onNavigate(userRole === 'RECRUTEUR' ? 'recruiter-profile' : 'profile')}
-                  isActive={isActive('recruiter-profile') || isActive('profile')}
-                />
+                {userRole !== 'ADMIN' && (
+                  <NavLink
+                    icon={<User className="h-4 w-4" />}
+                    label="Profile"
+                    onClick={() => onNavigate(getProfilePage())}
+                    isActive={isActive('recruiter-profile') || isActive('profile')}
+                  />
+                )}
               </>
             )}
           </div>
@@ -88,7 +126,7 @@ export function Navbar({ isLoggedIn, userRole, currentPage, onNavigate, onLogout
             {isLoggedIn ? (
               <>
                 <span className="hidden sm:inline text-sm text-secondary">
-                  {userRole === 'RECRUTEUR' ? 'Recruiter' : 'Candidate'}
+                  {getRoleLabel()}
                 </span>
                 <Button
                   onClick={handleLogout}
@@ -135,17 +173,25 @@ export function Navbar({ isLoggedIn, userRole, currentPage, onNavigate, onLogout
               isActive={isActive('job-listings')}
             />
             <MobileNavLink
-              icon={<FileText className="h-4 w-4" />}
+              icon={
+                userRole === 'ADMIN' ? (
+                  <ShieldCheck className="h-4 w-4" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )
+              }
               label="Dashboard"
-              onClick={() => onNavigate(userRole === 'RECRUTEUR' ? 'employer-dashboard' : 'candidate-dashboard')}
-              isActive={isActive('employer-dashboard') || isActive('candidate-dashboard')}
+              onClick={() => onNavigate(getDashboardPage())}
+              isActive={isDashboardActive()}
             />
-            <MobileNavLink
-              icon={<User className="h-4 w-4" />}
-              label="Profile"
-              onClick={() => onNavigate(userRole === 'RECRUTEUR' ? 'recruiter-profile' : 'profile')}
-              isActive={isActive('recruiter-profile') || isActive('profile')}
-            />
+            {userRole !== 'ADMIN' && (
+              <MobileNavLink
+                icon={<User className="h-4 w-4" />}
+                label="Profile"
+                onClick={() => onNavigate(getProfilePage())}
+                isActive={isActive('recruiter-profile') || isActive('profile')}
+              />
+            )}
           </div>
         )}
       </div>
@@ -154,12 +200,12 @@ export function Navbar({ isLoggedIn, userRole, currentPage, onNavigate, onLogout
 }
 
 // Desktop Nav Link Component
-function NavLink({ 
-  icon, 
-  label, 
-  onClick, 
-  isActive 
-}: { 
+function NavLink({
+  icon,
+  label,
+  onClick,
+  isActive,
+}: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
@@ -170,8 +216,8 @@ function NavLink({
       onClick={onClick}
       className={`
         flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
-        ${isActive 
-          ? 'bg-primary-light text-primary' 
+        ${isActive
+          ? 'bg-primary-light text-primary'
           : 'text-secondary hover:bg-surface hover:text-foreground'
         }
       `}
@@ -183,12 +229,12 @@ function NavLink({
 }
 
 // Mobile Nav Link Component
-function MobileNavLink({ 
-  icon, 
-  label, 
-  onClick, 
-  isActive 
-}: { 
+function MobileNavLink({
+  icon,
+  label,
+  onClick,
+  isActive,
+}: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
@@ -199,8 +245,8 @@ function MobileNavLink({
       onClick={onClick}
       className={`
         flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors
-        ${isActive 
-          ? 'bg-primary-light text-primary' 
+        ${isActive
+          ? 'bg-primary-light text-primary'
           : 'text-secondary hover:bg-surface hover:text-foreground'
         }
       `}

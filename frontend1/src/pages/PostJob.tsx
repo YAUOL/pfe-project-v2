@@ -1,4 +1,4 @@
-import { ArrowLeft, Briefcase, MapPin, FileText } from 'lucide-react';
+import { ArrowLeft, Briefcase, MapPin, FileText, Building2, DollarSign } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -13,18 +13,28 @@ interface PostJobProps {
 export function PostJob({ onNavigate }: PostJobProps) {
   const [formData, setFormData] = useState({
     titre: '',
+    company: '',
     localisation: '',
     typeContrat: 'CDI',
+    category: '',
+    experienceLevel: '',
+    salaryMin: 0,
+    salaryMax: 0,
     competencesRequises: '',
     description: '',
   });
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: name === 'salaryMin' || name === 'salaryMax' ? Number(value) : value,
     });
   };
 
@@ -32,8 +42,23 @@ export function PostJob({ onNavigate }: PostJobProps) {
     e.preventDefault();
     setError(null);
 
-    if (!formData.titre || !formData.localisation || !formData.description) {
+    if (
+      !formData.titre ||
+      !formData.company ||
+      !formData.localisation ||
+      !formData.description ||
+      !formData.category ||
+      !formData.experienceLevel ||
+      !formData.competencesRequises ||
+      formData.salaryMin <= 0 ||
+      formData.salaryMax <= 0
+    ) {
       setError('Please fill in all required fields');
+      return;
+    }
+
+    if (formData.salaryMin > formData.salaryMax) {
+      setError('Minimum salary cannot be greater than maximum salary');
       return;
     }
 
@@ -53,7 +78,6 @@ export function PostJob({ onNavigate }: PostJobProps) {
   return (
     <div className="bg-surface min-h-screen py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Back Button */}
         <Button
           variant="ghost"
           onClick={() => onNavigate('employer-dashboard')}
@@ -63,7 +87,6 @@ export function PostJob({ onNavigate }: PostJobProps) {
           Back to Dashboard
         </Button>
 
-        {/* Header */}
         <div className="bg-white rounded-xl border border-color p-6 mb-8">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 bg-primary-light rounded-lg flex items-center justify-center flex-shrink-0">
@@ -78,10 +101,8 @@ export function PostJob({ onNavigate }: PostJobProps) {
           </div>
         </div>
 
-        {/* Job Form */}
         <div className="bg-white rounded-xl border border-color p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Job Title */}
             <div>
               <Label htmlFor="titre" className="mb-2 block">
                 Job Title *
@@ -98,7 +119,25 @@ export function PostJob({ onNavigate }: PostJobProps) {
               />
             </div>
 
-            {/* Location */}
+            <div>
+              <Label htmlFor="company" className="mb-2 block">
+                Company *
+              </Label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted" />
+                <Input
+                  id="company"
+                  name="company"
+                  type="text"
+                  placeholder="e.g. TechCorp Solutions"
+                  required
+                  value={formData.company}
+                  onChange={handleChange}
+                  className="pl-10 h-12 border-color rounded-lg"
+                />
+              </div>
+            </div>
+
             <div>
               <Label htmlFor="localisation" className="mb-2 block">
                 Location *
@@ -118,7 +157,6 @@ export function PostJob({ onNavigate }: PostJobProps) {
               </div>
             </div>
 
-            {/* Contract Type */}
             <div>
               <Label htmlFor="typeContrat" className="mb-2 block">
                 Contract Type *
@@ -138,7 +176,85 @@ export function PostJob({ onNavigate }: PostJobProps) {
               </select>
             </div>
 
-            {/* Required Skills */}
+            <div>
+              <Label htmlFor="category" className="mb-2 block">
+                Category *
+              </Label>
+              <select
+                id="category"
+                name="category"
+                required
+                value={formData.category}
+                onChange={handleChange}
+                className="w-full h-12 px-3 border border-color rounded-lg bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">Select category</option>
+                <option value="Tech">Tech</option>
+                <option value="Design">Design</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Management">Management</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="experienceLevel" className="mb-2 block">
+                Experience Level *
+              </Label>
+              <select
+                id="experienceLevel"
+                name="experienceLevel"
+                required
+                value={formData.experienceLevel}
+                onChange={handleChange}
+                className="w-full h-12 px-3 border border-color rounded-lg bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">Select experience level</option>
+                <option value="Junior">Junior</option>
+                <option value="Mid-Level">Mid-Level</option>
+                <option value="Senior">Senior</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="salaryMin" className="mb-2 block">
+                  Minimum Salary (k) *
+                </Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted" />
+                  <Input
+                    id="salaryMin"
+                    name="salaryMin"
+                    type="number"
+                    required
+                    min="0"
+                    value={formData.salaryMin || ''}
+                    onChange={handleChange}
+                    className="pl-10 h-12 border-color rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="salaryMax" className="mb-2 block">
+                  Maximum Salary (k) *
+                </Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted" />
+                  <Input
+                    id="salaryMax"
+                    name="salaryMax"
+                    type="number"
+                    required
+                    min="0"
+                    value={formData.salaryMax || ''}
+                    onChange={handleChange}
+                    className="pl-10 h-12 border-color rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div>
               <Label htmlFor="competencesRequises" className="mb-2 block">
                 Required Skills *
@@ -147,7 +263,7 @@ export function PostJob({ onNavigate }: PostJobProps) {
                 id="competencesRequises"
                 name="competencesRequises"
                 type="text"
-                placeholder="e.g. JavaScript, React, Node.js (separated by commas)"
+                placeholder="e.g. JavaScript, React, Node.js"
                 required
                 value={formData.competencesRequises}
                 onChange={handleChange}
@@ -158,7 +274,6 @@ export function PostJob({ onNavigate }: PostJobProps) {
               </p>
             </div>
 
-            {/* Job Description */}
             <div>
               <Label htmlFor="description" className="mb-2 block">
                 Job Description *
@@ -173,12 +288,8 @@ export function PostJob({ onNavigate }: PostJobProps) {
                 onChange={handleChange}
                 className="border-color rounded-lg resize-none"
               />
-              <p className="text-sm text-muted mt-2">
-                Minimum 100 characters
-              </p>
             </div>
 
-            {/* Preview Section */}
             <div className="bg-surface rounded-lg p-6">
               <h3 className="mb-3 flex items-center">
                 <FileText className="h-5 w-5 mr-2 text-primary" />
@@ -186,20 +297,27 @@ export function PostJob({ onNavigate }: PostJobProps) {
               </h3>
               <div className="space-y-2 text-sm text-secondary">
                 <p><strong>Title:</strong> {formData.titre || 'Not specified'}</p>
+                <p><strong>Company:</strong> {formData.company || 'Not specified'}</p>
                 <p><strong>Location:</strong> {formData.localisation || 'Not specified'}</p>
                 <p><strong>Type:</strong> {formData.typeContrat}</p>
+                <p><strong>Category:</strong> {formData.category || 'Not specified'}</p>
+                <p><strong>Experience:</strong> {formData.experienceLevel || 'Not specified'}</p>
+                <p>
+                  <strong>Salary:</strong>{' '}
+                  {formData.salaryMin && formData.salaryMax
+                    ? `$${formData.salaryMin}k - $${formData.salaryMax}k`
+                    : 'Not specified'}
+                </p>
                 <p><strong>Skills:</strong> {formData.competencesRequises || 'Not specified'}</p>
               </div>
             </div>
 
-            {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
                 {error}
               </div>
             )}
 
-            {/* Submit Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <Button
                 type="submit"
@@ -220,7 +338,6 @@ export function PostJob({ onNavigate }: PostJobProps) {
           </form>
         </div>
 
-        {/* Tips */}
         <div className="bg-primary-light rounded-xl p-6 mt-8">
           <h3 className="mb-4 text-primary">Tips for Writing a Great Job Posting</h3>
           <ul className="space-y-2 text-sm text-secondary">

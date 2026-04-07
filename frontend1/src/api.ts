@@ -47,10 +47,19 @@ export async function registerCandidate(
   password: string,
   role: string = "CANDIDAT"
 ) {
-  const [prenom, ...rest] = fullName.trim().split(" ");
-  const nom = rest.join(" ") || prenom;
+  const parts = fullName.trim().split(" ").filter(Boolean);
+  const prenom = parts[0] || "";
+  const nom = parts.slice(1).join(" ") || prenom;
 
-  const body = { nom, prenom, email, password, role };
+  const allowedRole = role === "RECRUTEUR" ? "RECRUTEUR" : "CANDIDAT";
+
+  const body = {
+    nom,
+    prenom,
+    email,
+    password,
+    role: allowedRole,
+  };
 
   try {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
@@ -67,6 +76,113 @@ export async function registerCandidate(
     console.error("register request failed", err);
     throw err;
   }
+}
+
+// ========================================
+// ADMIN TYPES & FUNCTIONS
+// ========================================
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  nom: string;
+  prenom: string;
+  role: string;
+  createdAt?: string;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  totalCandidates: number;
+  totalRecruiters: number;
+  totalAdmins: number;
+  totalOffres: number;
+}
+
+function getAuthHeaders() {
+  const token = localStorage.getItem("authToken");
+  if (!token) throw new Error("You must be logged in");
+
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+}
+
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  const response = await fetch(`${API_BASE_URL}/admin/users`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to fetch users");
+  }
+
+  return await response.json();
+}
+
+export async function deleteAdminUser(userId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to delete user");
+  }
+}
+
+export async function getAdminOffres(): Promise<OffreDTO[]> {
+  const response = await fetch(`${API_BASE_URL}/admin/offres`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to fetch offers");
+  }
+
+  return await response.json();
+}
+
+export async function deleteAdminOffre(offreId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/admin/offres/${offreId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to delete offer");
+  }
+}
+
+export async function getAdminStats(): Promise<AdminStats> {
+  const response = await fetch(`${API_BASE_URL}/admin/stats`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to fetch admin stats");
+  }
+
+  return await response.json();
 }
 
 // ========================================
@@ -333,6 +449,11 @@ export interface OffreDTO {
   localisation: string;
   typeContrat: string;
   competencesRequises: string;
+  company: string;
+  category: string;
+  experienceLevel: string;
+  salaryMin: number;
+  salaryMax: number;
   active: boolean;
   createdAt: string;
 }
@@ -342,9 +463,8 @@ export async function getMesOffres(): Promise<OffreDTO[]> {
   if (!token) throw new Error("You must be logged in");
 
   try {
-    // ✅ Get user profile to get recruteurId
     const profile = await getMyProfile();
-    
+
     const response = await fetch(`${API_BASE_URL}/offres/recruteur/${profile.id}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
@@ -392,14 +512,13 @@ export async function deleteOffre(offreId: number): Promise<void> {
 }
 
 export async function createOffre(
-  offre: Omit<OffreDTO, "id" | "active" | "createdAt">,
-  recruteurId: number
+  offre: Omit<OffreDTO, "id" | "active" | "createdAt">
 ): Promise<OffreDTO> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
 
   try {
-    const response = await fetch(`${API_BASE_URL}/offres?recruteurId=${recruteurId}`, {
+    const response = await fetch(`${API_BASE_URL}/offres`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

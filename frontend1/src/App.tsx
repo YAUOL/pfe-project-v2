@@ -6,6 +6,7 @@ import { JobListings } from './pages/JobListings';
 import { JobDetail } from './pages/JobDetail';
 import { CandidateDashboard } from './pages/CandidateDashboard';
 import { RecruiterDashboard } from './pages/RecruiterDashboard';
+import { AdminDashboard } from './pages/AdminDashboard';
 import { PostJob } from './pages/PostJob';
 import { JobApplication } from './pages/JobApplication';
 import { Login } from './pages/Login';
@@ -20,6 +21,7 @@ type Page =
   | 'job-detail'
   | 'employer-dashboard'
   | 'candidate-dashboard'
+  | 'admin-dashboard'
   | 'job-application'
   | 'login'
   | 'signup'
@@ -48,6 +50,12 @@ export default function App() {
   }, []);
 
   const handleNavigate = (page: string, jobId?: string) => {
+    // Optional route protection
+    if (page === 'admin-dashboard' && userRole !== 'ADMIN') {
+      setCurrentPage('home');
+      return;
+    }
+
     setCurrentPage(page as Page);
     if (jobId) {
       setSelectedJobId(jobId);
@@ -68,7 +76,16 @@ export default function App() {
     const role = localStorage.getItem('authRole');
     setIsLoggedIn(true);
     setUserRole(role);
-    setCurrentPage('home');
+
+    if (role === 'ADMIN') {
+      setCurrentPage('admin-dashboard');
+    } else if (role === 'RECRUTEUR') {
+      setCurrentPage('employer-dashboard');
+    } else if (role === 'CANDIDAT') {
+      setCurrentPage('candidate-dashboard');
+    } else {
+      setCurrentPage('home');
+    }
   };
 
   const showNavbarAndFooter = !['login', 'signup', 'forgot-password'].includes(currentPage);
@@ -89,6 +106,11 @@ export default function App() {
 
       case 'candidate-dashboard':
         return <CandidateDashboard onNavigate={handleNavigate} />;
+
+      case 'admin-dashboard':
+        return userRole === 'ADMIN'
+          ? <AdminDashboard onNavigate={handleNavigate} />
+          : <Home onNavigate={handleNavigate} />;
 
       case 'job-application':
         return <JobApplication jobId={selectedJobId} onNavigate={handleNavigate} />;

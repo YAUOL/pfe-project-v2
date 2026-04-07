@@ -28,13 +28,13 @@ function scoreColor(score: number) {
 
 function statusInfo(statut: string) {
   switch (statut) {
-    case 'ACCEPTED':
+    case 'ACCEPTE':
       return {
         label: 'Accepted',
         cls: 'bg-green-100 text-green-700',
         icon: <CheckCircle className="h-4 w-4 text-green-600" />
       };
-    case 'REJECTED':
+    case 'REFUSE':
       return {
         label: 'Rejected',
         cls: 'bg-red-100 text-red-700',
@@ -90,7 +90,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
       );
       const offer = await offerResponse.json();
       setOfferTitle(offer.titre);
-
     } catch (err) {
       console.error('Failed to load candidates:', err);
     } finally {
@@ -98,21 +97,18 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
     }
   };
 
-  // Re-extract text + calculate scores for all CVs
   const reExtractAndCalculate = async () => {
     try {
       setCalculatingScores(true);
       const token = localStorage.getItem('authToken');
 
       for (const candidate of candidates) {
-        // Step 1: Re-extract text from file
         console.log(`📄 Re-extracting text for CV ${candidate.cv.id}...`);
         await fetch(`http://localhost:8080/api/cv/${candidate.cv.id}/reextract`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        // Step 2: Calculate matching score
         console.log(`🤖 Calculating score for CV ${candidate.cv.id}...`);
         try {
           await calculateMatchingScore(candidate.cv.id);
@@ -123,7 +119,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
 
       await loadCandidates();
       alert('✅ Text extracted and scores calculated!');
-
     } catch (err) {
       console.error('Failed:', err);
       alert('Error during extraction');
@@ -135,7 +130,8 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
   const handleUpdateStatus = async (cvId: number, statut: 'ACCEPTED' | 'REJECTED') => {
     try {
       setUpdatingStatus(cvId);
-      await updateCandidatureStatus(cvId, statut);
+      const apiStatut = statut === 'ACCEPTED' ? 'ACCEPTE' : 'REFUSE';
+      await updateCandidatureStatus(cvId, apiStatut);
       await loadCandidates();
     } catch (err) {
       console.error('Failed to update status:', err);
@@ -189,7 +185,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
     <div className="bg-surface min-h-screen py-8 px-4">
       <div className="max-w-7xl mx-auto">
 
-        {/* Back */}
         <Button
           variant="ghost"
           onClick={() => onNavigate('employer-dashboard')}
@@ -199,7 +194,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
           Back to Dashboard
         </Button>
 
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
@@ -214,7 +208,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-xl border border-color p-5">
             <div className="flex items-center gap-3">
@@ -255,7 +248,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
           </div>
         </div>
 
-        {/* Search + Button */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary" />
@@ -286,7 +278,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
           </Button>
         </div>
 
-        {/* Candidates List */}
         <div className="bg-white rounded-xl border border-color overflow-hidden">
           <div className="p-6 border-b border-color">
             <div className="flex items-center gap-2">
@@ -317,29 +308,24 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
 
                 return (
                   <div key={cv.id} className="group">
-
-                    {/* Collapsed Row */}
                     <div
                       className={`flex items-center gap-4 p-5 cursor-pointer transition-colors ${
                         isExpanded ? 'bg-primary-light/30' : 'hover:bg-surface'
                       }`}
                       onClick={() => setExpandedId(isExpanded ? null : cv.id)}
                     >
-                      {/* Rank */}
                       <div className="w-8 h-8 rounded-full bg-primary-light flex items-center justify-center flex-shrink-0">
                         <span className="text-xs font-bold text-primary">
                           #{index + 1}
                         </span>
                       </div>
 
-                      {/* Avatar */}
                       <div className="w-11 h-11 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-sm font-bold">
                           {cv.candidat.prenom?.[0]}{cv.candidat.nom?.[0]}
                         </span>
                       </div>
 
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                           <p className="font-semibold text-sm">
@@ -367,7 +353,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                         </div>
                       </div>
 
-                      {/* Score */}
                       {matchingScore && sc ? (
                         <div className="flex items-center gap-3 min-w-[140px] justify-end">
                           <div className="text-right">
@@ -393,7 +378,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                         </Badge>
                       )}
 
-                      {/* Arrow */}
                       <div className="flex-shrink-0">
                         {isExpanded
                           ? <ChevronUp className="h-5 w-5 text-muted" />
@@ -402,15 +386,10 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                       </div>
                     </div>
 
-                    {/* Expanded Detail */}
                     {isExpanded && (
                       <div className="px-5 pb-5 bg-primary-light/10 border-t border-color/50">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-5">
-
-                          {/* LEFT: Info + Skills */}
                           <div className="space-y-4">
-
-                            {/* Candidate Info */}
                             <div>
                               <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                                 <User className="h-4 w-4 text-primary" />
@@ -452,7 +431,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                               </div>
                             </div>
 
-                            {/* AI Skill Analysis */}
                             {matchingScore && (
                               <div>
                                 <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -501,10 +479,7 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                             )}
                           </div>
 
-                          {/* RIGHT: File + Preview + Score */}
                           <div>
-
-                            {/* View + Download */}
                             <div className="flex gap-2 mb-4">
                               <a
                                 href={`http://localhost:8080/api/cv/${cv.id}/file`}
@@ -537,7 +512,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                               </Button>
                             </div>
 
-                            {/* CV Text Preview */}
                             <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                               <Eye className="h-4 w-4 text-primary" />
                               CV Content Preview
@@ -557,7 +531,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                               )}
                             </div>
 
-                            {/* Score Bar */}
                             {matchingScore && sc && (
                               <div className="mt-4 bg-white rounded-lg p-4">
                                 <div className="flex items-center justify-between mb-2">
@@ -584,14 +557,13 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                           </div>
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="flex items-center justify-between mt-6 pt-4 border-t border-color/50">
                           <div className="flex items-center gap-2 text-sm text-secondary">
                             {status.icon}
                             <span>Current status: <strong>{status.label}</strong></span>
                           </div>
                           <div className="flex gap-3">
-                            {cv.statut !== 'ACCEPTED' && (
+                            {cv.statut !== 'ACCEPTE' && (
                               <Button
                                 onClick={e => {
                                   e.stopPropagation();
@@ -607,7 +579,7 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                                 Accept
                               </Button>
                             )}
-                            {cv.statut !== 'REJECTED' && (
+                            {cv.statut !== 'REFUSE' && (
                               <Button
                                 onClick={e => {
                                   e.stopPropagation();

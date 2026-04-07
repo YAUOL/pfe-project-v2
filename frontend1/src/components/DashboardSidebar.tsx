@@ -7,19 +7,26 @@ import {
   PlusCircle,
   Bookmark,
   Menu,
-  X
+  X,
+  Users,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { useState } from 'react';
 
 interface DashboardSidebarProps {
-  userType: 'Recruteur' | 'candidate';
+  userType: 'Recruteur' | 'candidate' | 'admin';
   activePage: string;
   onNavigate: (page: string) => void;
   onLogout: () => void;
 }
 
-export function DashboardSidebar({ userType, activePage, onNavigate, onLogout }: DashboardSidebarProps) {
+export function DashboardSidebar({
+  userType,
+  activePage,
+  onNavigate,
+  onLogout,
+}: DashboardSidebarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const employerMenuItems = [
@@ -36,30 +43,56 @@ export function DashboardSidebar({ userType, activePage, onNavigate, onLogout }:
     { icon: Bookmark, label: 'Saved Jobs', path: 'saved-jobs' },
   ];
 
-  const menuItems = userType === 'Recruteur' ? employerMenuItems : candidateMenuItems;
+  const adminMenuItems = [
+    { icon: LayoutDashboard, label: 'Dashboard', path: 'admin-dashboard' },
+    { icon: Users, label: 'Users Management', path: 'admin-dashboard' },
+    { icon: Briefcase, label: 'Offers Management', path: 'admin-dashboard' },
+    { icon: ShieldCheck, label: 'Platform Control', path: 'admin-dashboard' },
+  ];
+
+  const menuItems =
+    userType === 'Recruteur'
+      ? employerMenuItems
+      : userType === 'admin'
+      ? adminMenuItems
+      : candidateMenuItems;
+
+  const portalLabel =
+    userType === 'Recruteur'
+      ? 'Recruiter Portal'
+      : userType === 'admin'
+      ? 'Admin Portal'
+      : 'Candidate Portal';
+
+  const portalInitials =
+    userType === 'admin'
+      ? 'AD'
+      : userType === 'Recruteur'
+      ? 'JB'
+      : 'JB';
 
   const SidebarContent = () => (
     <>
       <div className="p-6 border-b border-color">
         <div className="flex items-center">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center mr-3">
-            <span className="text-white font-bold">JB</span>
+            <span className="text-white font-bold">{portalInitials}</span>
           </div>
           <div>
             <h2 className="font-semibold">JobBoard</h2>
-            <p className="text-sm text-secondary capitalize">{userType} Portal</p>
+            <p className="text-sm text-secondary">{portalLabel}</p>
           </div>
         </div>
       </div>
 
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
-          {menuItems.map((item) => {
+          {menuItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = activePage === item.path;
 
             return (
-              <li key={item.path}>
+              <li key={`${item.path}-${index}`}>
                 <button
                   onClick={() => {
                     onNavigate(item.path);
@@ -95,7 +128,6 @@ export function DashboardSidebar({ userType, activePage, onNavigate, onLogout }:
 
   return (
     <>
-      {/* Mobile Menu Button */}
       <button
         className="lg:hidden fixed top-20 left-4 z-50 bg-white border border-color rounded-lg p-2 shadow-custom-md"
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -107,12 +139,10 @@ export function DashboardSidebar({ userType, activePage, onNavigate, onLogout }:
         )}
       </button>
 
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-64 bg-white border-r border-color h-screen sticky top-0">
         <SidebarContent />
       </aside>
 
-      {/* Mobile Sidebar */}
       {mobileMenuOpen && (
         <>
           <div

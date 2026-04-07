@@ -44,10 +44,8 @@ export function Signup({ onNavigate }: SignupProps) {
     try {
       setSubmitting(true);
 
-      // Détermine le rôle selon le type sélectionné
       const role = userType === 'employer' ? 'RECRUTEUR' : 'CANDIDAT';
 
-      // Envoie au backend avec le bon rôle
       await registerCandidate(formData.fullName, formData.email, formData.password, role);
 
       alert('Account created successfully! You can now log in.');
@@ -72,7 +70,6 @@ export function Signup({ onNavigate }: SignupProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-2xl w-full">
-        {/* Back to Landing Page (top-left) */}
         <div className="mb-4 flex justify-start">
           <button
             type="button"
@@ -82,7 +79,7 @@ export function Signup({ onNavigate }: SignupProps) {
             ← Back to landing page
           </button>
         </div>
-        {/* Logo and Title */}
+
         <div className="text-center mb-8">
           <img
             src="/logo.png"
@@ -93,7 +90,6 @@ export function Signup({ onNavigate }: SignupProps) {
           <p className="text-secondary">Join thousands of professionals on JobBoard</p>
         </div>
 
-        {/* Account Type Selection */}
         {!userType ? (
           <div className="bg-white rounded-2xl shadow-custom-lg border border-color p-8">
             <h2 className="text-center mb-6">I want to...</h2>
@@ -137,7 +133,6 @@ export function Signup({ onNavigate }: SignupProps) {
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow-custom-lg border border-color p-8">
-            {/* Rest of the form... */}
             <button
               onClick={() => setUserType(null)}
               className="text-secondary hover:text-primary mb-6 text-sm transition-colors"
@@ -156,9 +151,7 @@ export function Signup({ onNavigate }: SignupProps) {
               </span>
             </div>
 
-            {/* Form continues... (rest unchanged) */}
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Full Name */}
               <div>
                 <Label htmlFor="fullName" className="mb-2 block">
                   Full Name
@@ -178,7 +171,6 @@ export function Signup({ onNavigate }: SignupProps) {
                 </div>
               </div>
 
-              {/* Email */}
               <div>
                 <Label htmlFor="email" className="mb-2 block">
                   Email Address
@@ -198,7 +190,6 @@ export function Signup({ onNavigate }: SignupProps) {
                 </div>
               </div>
 
-              {/* Password */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="password" className="mb-2 block">
@@ -239,7 +230,6 @@ export function Signup({ onNavigate }: SignupProps) {
                 </div>
               </div>
 
-              {/* Password Requirements */}
               <div className="bg-surface rounded-lg p-4">
                 <p className="text-sm font-medium mb-2">Password must contain:</p>
                 <ul className="text-sm text-secondary space-y-1">
@@ -250,19 +240,18 @@ export function Signup({ onNavigate }: SignupProps) {
                 </ul>
               </div>
 
-              {/* Terms and Conditions */}
               <div className="flex items-start">
-                <Checkbox 
+                <Checkbox
                   id="agreeToTerms"
                   name="agreeToTerms"
                   checked={formData.agreeToTerms}
-                  onCheckedChange={(checked) => 
+                  onCheckedChange={(checked) =>
                     setFormData({ ...formData, agreeToTerms: checked as boolean })
                   }
                   className="mt-1"
                 />
-                <Label 
-                  htmlFor="agreeToTerms" 
+                <Label
+                  htmlFor="agreeToTerms"
                   className="ml-3 cursor-pointer text-sm text-secondary"
                 >
                   I agree to the{' '}
@@ -272,7 +261,6 @@ export function Signup({ onNavigate }: SignupProps) {
                 </Label>
               </div>
 
-              {/* Sign Up Button */}
               <Button
                 type="submit"
                 disabled={submitting}
@@ -281,13 +269,13 @@ export function Signup({ onNavigate }: SignupProps) {
                 {submitting ? 'Creating Account...' : 'Create Account'}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
+
               {error && (
                 <p className="text-sm text-red-600 mt-2 text-center">
                   {error}
                 </p>
               )}
 
-              {/* Sign In Link */}
               <p className="text-center mt-6 text-secondary">
                 Already have an account?{' '}
                 <button

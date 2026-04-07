@@ -16,41 +16,32 @@ public class UtilisateurService {
     private final UtilisateurRepository utilisateurRepository;
     private final PasswordEncoder passwordEncoder;
 
-    // ✅ Create user WITH HASH
     public Utilisateur createUtilisateur(Utilisateur utilisateur) {
-
-        // 🔐 HASH PASSWORD
         utilisateur.setPassword(passwordEncoder.encode(utilisateur.getPassword()));
-
         return utilisateurRepository.save(utilisateur);
     }
 
-    // ✅ Find by email
     public Optional<Utilisateur> findByEmail(String email) {
         return utilisateurRepository.findByEmail(email);
     }
 
-    // ✅ Get all users
     public List<Utilisateur> getAllUtilisateurs() {
         return utilisateurRepository.findAll();
     }
 
-    // ✅ Get user by id
     public Optional<Utilisateur> getUtilisateurById(Long id) {
         return utilisateurRepository.findById(id);
     }
 
-    // ✅ Delete user
     public void deleteUtilisateur(Long id) {
         utilisateurRepository.deleteById(id);
     }
 
-    // ✅ Check password
     public boolean checkPassword(String rawPassword, String encodedPassword) {
         return passwordEncoder.matches(rawPassword, encodedPassword);
     }
-    public Utilisateur save(Utilisateur utilisateur) {
-    return utilisateurRepository.save(utilisateur);
-}
 
+    public Utilisateur save(Utilisateur utilisateur) {
+        return utilisateurRepository.save(utilisateur);
+    }
 }

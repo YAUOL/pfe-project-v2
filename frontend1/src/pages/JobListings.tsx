@@ -1,7 +1,10 @@
-import { Search, MapPin, Filter, Briefcase, Clock, DollarSign, ArrowLeft } from 'lucide-react';
+import { Search, MapPin, SlidersHorizontal, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { JobCard } from '../components/JobCard';
+import { JobCard, JobCardData } from '../components/JobCard';
+import { Checkbox } from '../components/ui/checkbox';
+import { Label } from '../components/ui/label';
+import { Slider } from '../components/ui/slider';
 import { useState, useEffect } from 'react';
 import { getAllOffres, OffreDTO } from '../api';
 
@@ -11,13 +14,16 @@ interface JobListingsProps {
 
 export function JobListings({ onNavigate }: JobListingsProps) {
   const [jobs, setJobs] = useState<OffreDTO[]>([]);
-  const [filteredJobs, setFilteredJobs] = useState<OffreDTO[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [locationFilter, setLocationFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
 
-  // Charger les offres depuis le backend
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchLocation, setSearchLocation] = useState('');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedExperience, setSelectedExperience] = useState<string[]>([]);
+  const [salaryRange, setSalaryRange] = useState([0]);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
   useEffect(() => {
     loadJobs();
   }, []);
@@ -26,8 +32,7 @@ export function JobListings({ onNavigate }: JobListingsProps) {
     try {
       setLoading(true);
       const offres = await getAllOffres();
-      setJobs(offres);
-      setFilteredJobs(offres);
+      setJobs(offres.filter(job => job.active));
     } catch (err) {
       console.error('Failed to load jobs:', err);
     } finally {
@@ -35,40 +40,194 @@ export function JobListings({ onNavigate }: JobListingsProps) {
     }
   };
 
-  // Appliquer les filtres
-  useEffect(() => {
-    let filtered = jobs;
+  const handleTypeChange = (type: string) => {
+    setSelectedTypes(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
 
-    // Filtre par type de contrat
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(job => job.typeContrat === typeFilter);
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategories(prev =>
+      prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]
+    );
+  };
+
+  const handleExperienceChange = (level: string) => {
+    setSelectedExperience(prev =>
+      prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]
+    );
+  };
+
+  const clearFilters = () => {
+    setSelectedTypes([]);
+    setSelectedCategories([]);
+    setSelectedExperience([]);
+    setSalaryRange([0]);
+    setSearchKeyword('');
+    setSearchLocation('');
+  };
+
+  const jobTypes = ['CDI', 'CDD', 'Stage', 'Freelance'];
+  const jobCategories = ['Tech', 'Design', 'Marketing', 'Management'];
+  const experienceLevels = ['Junior', 'Mid-Level', 'Senior'];
+
+  const filteredJobs = jobs.filter(job => {
+    if (
+      searchKeyword &&
+      !job.titre.toLowerCase().includes(searchKeyword.toLowerCase()) &&
+      !job.description.toLowerCase().includes(searchKeyword.toLowerCase()) &&
+      !job.company.toLowerCase().includes(searchKeyword.toLowerCase()) &&
+      !job.competencesRequises.toLowerCase().includes(searchKeyword.toLowerCase())
+    ) {
+      return false;
     }
 
-    // Filtre par recherche (titre ou description)
-    if (searchTerm) {
-      filtered = filtered.filter(job =>
-        job.titre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.description.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    if (
+      searchLocation &&
+      !job.localisation.toLowerCase().includes(searchLocation.toLowerCase())
+    ) {
+      return false;
     }
 
-    // Filtre par localisation
-    if (locationFilter) {
-      filtered = filtered.filter(job =>
-        job.localisation.toLowerCase().includes(locationFilter.toLowerCase())
-      );
+    if (selectedTypes.length > 0 && !selectedTypes.includes(job.typeContrat)) {
+      return false;
     }
 
-    setFilteredJobs(filtered);
-  }, [searchTerm, locationFilter, typeFilter, jobs]);
+    if (selectedCategories.length > 0 && !selectedCategories.includes(job.category)) {
+      return false;
+    }
 
-  const jobTypes = [
-    { value: 'all', label: 'All Types' },
-    { value: 'CDI', label: 'Full-time (CDI)' },
-    { value: 'CDD', label: 'Contract (CDD)' },
-    { value: 'Stage', label: 'Internship' },
-    { value: 'Freelance', label: 'Freelance' },
-  ];
+    if (selectedExperience.length > 0 && !selectedExperience.includes(job.experienceLevel)) {
+      return false;
+    }
+
+    if (salaryRange[0] > 0 && job.salaryMax < salaryRange[0]) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const adaptedJobs: JobCardData[] = filteredJobs.map(job => ({
+    id: job.id.toString(),
+    title: job.titre,
+    company: job.company,
+    location: job.localisation,
+    salaryRange: `$${job.salaryMin}k - $${job.salaryMax}k`,
+    type:
+      job.typeContrat === 'CDI'
+        ? 'Full-time'
+        : job.typeContrat === 'CDD'
+        ? 'Contract'
+        : job.typeContrat === 'Stage'
+        ? 'Internship'
+        : job.typeContrat,
+    postedDate: new Date(job.createdAt).toLocaleDateString(),
+    description: job.description,
+    skills: job.competencesRequises
+      .split(',')
+      .map(skill => skill.trim())
+      .filter(Boolean),
+    category: job.category,
+    experienceLevel: job.experienceLevel,
+    featured: job.active,
+  }));
+
+  const FilterSidebar = () => (
+    <div className="bg-white rounded-xl border border-color p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="flex items-center">
+          <SlidersHorizontal className="h-5 w-5 mr-2 text-primary" />
+          Filters
+        </h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearFilters}
+          className="text-primary hover:text-primary-hover"
+        >
+          Clear All
+        </Button>
+      </div>
+
+      <div className="mb-6">
+        <h4 className="mb-3">Job Type</h4>
+        <div className="space-y-3">
+          {jobTypes.map((type) => (
+            <div key={type} className="flex items-center">
+              <Checkbox
+                id={`type-${type}`}
+                checked={selectedTypes.includes(type)}
+                onCheckedChange={() => handleTypeChange(type)}
+              />
+              <Label htmlFor={`type-${type}`} className="ml-3 cursor-pointer text-secondary">
+                {type === 'CDI'
+                  ? 'Full-time'
+                  : type === 'CDD'
+                  ? 'Contract'
+                  : type === 'Stage'
+                  ? 'Internship'
+                  : type}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h4 className="mb-3">Category</h4>
+        <div className="space-y-3">
+          {jobCategories.map((category) => (
+            <div key={category} className="flex items-center">
+              <Checkbox
+                id={`category-${category}`}
+                checked={selectedCategories.includes(category)}
+                onCheckedChange={() => handleCategoryChange(category)}
+              />
+              <Label htmlFor={`category-${category}`} className="ml-3 cursor-pointer text-secondary">
+                {category}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h4 className="mb-3">Experience Level</h4>
+        <div className="space-y-3">
+          {experienceLevels.map((level) => (
+            <div key={level} className="flex items-center">
+              <Checkbox
+                id={`experience-${level}`}
+                checked={selectedExperience.includes(level)}
+                onCheckedChange={() => handleExperienceChange(level)}
+              />
+              <Label htmlFor={`experience-${level}`} className="ml-3 cursor-pointer text-secondary">
+                {level}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h4 className="mb-3">Salary Range</h4>
+        <div className="px-2">
+          <Slider
+            value={salaryRange}
+            onValueChange={setSalaryRange}
+            max={200}
+            step={10}
+            className="mb-2"
+          />
+          <div className="flex justify-between text-sm text-secondary">
+            <span>$0k</span>
+            <span>${salaryRange[0]}k+</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -79,170 +238,106 @@ export function JobListings({ onNavigate }: JobListingsProps) {
   }
 
   return (
-    <div className="bg-surface min-h-screen py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Back Button */}
-        <Button
-          variant="ghost"
-          onClick={() => onNavigate('home')}
-          className="mb-6 text-secondary hover:text-primary"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Home
-        </Button>
-
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="mb-2">Find Your Dream Job</h1>
-          <p className="text-secondary">
-            Discover {filteredJobs.length} job opportunities matching your criteria
-          </p>
-        </div>
-
-        {/* Search and Filters */}
-        <div className="bg-white rounded-xl border border-color p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search by keyword */}
-            <div className="relative">
+    <div className="bg-surface min-h-screen py-8 px-4">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-xl shadow-custom-md p-6 mb-8">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted" />
               <Input
                 type="text"
-                placeholder="Job title or keyword"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Job title, keywords, or company"
                 className="pl-10 h-12 border-color rounded-lg"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
               />
             </div>
-
-            {/* Location filter */}
-            <div className="relative">
+            <div className="flex-1 relative">
               <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted" />
               <Input
                 type="text"
-                placeholder="City or region"
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
+                placeholder="City, state, or remote"
                 className="pl-10 h-12 border-color rounded-lg"
+                value={searchLocation}
+                onChange={(e) => setSearchLocation(e.target.value)}
               />
             </div>
-
-            {/* Job type filter */}
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted" />
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full h-12 pl-10 pr-3 border border-color rounded-lg bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent appearance-none"
-              >
-                {jobTypes.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Results count and sort */}
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-secondary">
-            Showing <span className="font-medium text-primary">{filteredJobs.length}</span> jobs
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-secondary">Sort by:</span>
-            <select className="px-3 py-2 border border-color rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary">
-              <option>Most Recent</option>
-              <option>Most Relevant</option>
-              <option>Salary: High to Low</option>
-              <option>Salary: Low to High</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Job Listings */}
-        {filteredJobs.length === 0 ? (
-          <div className="bg-white rounded-xl border border-color p-12 text-center">
-            <Briefcase className="h-16 w-16 text-muted mx-auto mb-4" />
-            <h3 className="mb-2">No jobs found</h3>
-            <p className="text-secondary mb-6">
-              Try adjusting your filters or search terms
-            </p>
-            <Button 
-              onClick={() => {
-                setSearchTerm('');
-                setLocationFilter('');
-                setTypeFilter('all');
-              }}
-              className="bg-primary hover:bg-primary-hover text-white rounded-lg"
-            >
-              Clear Filters
+            <Button className="h-12 px-8 bg-primary hover:bg-primary-hover text-white rounded-lg">
+              Search
             </Button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredJobs.map((job) => (
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-8">
+          <div className="lg:hidden">
+            <Button
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              variant="outline"
+              className="w-full border-color rounded-lg"
+            >
+              <SlidersHorizontal className="h-5 w-5 mr-2" />
+              {showMobileFilters ? 'Hide Filters' : 'Show Filters'}
+            </Button>
+          </div>
+
+          <aside className="hidden lg:block w-80 flex-shrink-0">
+            <FilterSidebar />
+          </aside>
+
+          {showMobileFilters && (
+            <div
+              className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-50"
+              onClick={() => setShowMobileFilters(false)}
+            >
               <div
-                key={job.id}
-                className="bg-white rounded-xl border border-color p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => onNavigate('job-detail', job.id.toString())}
+                className="absolute right-0 top-0 bottom-0 w-80 bg-surface p-4 overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 bg-primary-light rounded-lg flex items-center justify-center">
-                    <Briefcase className="h-6 w-6 text-primary" />
-                  </div>
-                  {job.active && (
-                    <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                      Active
-                    </span>
-                  )}
+                <div className="flex justify-between items-center mb-4">
+                  <h3>Filters</h3>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowMobileFilters(false)}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
                 </div>
+                <FilterSidebar />
+              </div>
+            </div>
+          )}
 
-                <h3 className="mb-2 line-clamp-1">{job.titre}</h3>
-                
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-sm text-secondary">
-                    <MapPin className="h-4 w-4 mr-2 text-primary" />
-                    {job.localisation}
-                  </div>
-                  <div className="flex items-center text-sm text-secondary">
-                    <Briefcase className="h-4 w-4 mr-2 text-primary" />
-                    {job.typeContrat}
-                  </div>
-                  <div className="flex items-center text-sm text-secondary">
-                    <Clock className="h-4 w-4 mr-2 text-primary" />
-                    Posted {new Date(job.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
+          <main className="flex-1">
+            <div className="mb-6 flex items-center justify-between">
+              <p className="text-secondary">
+                Showing <span className="font-semibold text-primary">{adaptedJobs.length}</span> jobs
+              </p>
+            </div>
 
-                <p className="text-sm text-secondary mb-4 line-clamp-2">
-                  {job.description}
-                </p>
+            <div className="space-y-6">
+              {adaptedJobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  onViewDetails={(jobId) => onNavigate('job-detail', jobId)}
+                />
+              ))}
+            </div>
 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {job.competencesRequises.split(',').slice(0, 3).map((skill, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 bg-primary-light text-primary text-xs rounded-lg"
-                    >
-                      {skill.trim()}
-                    </span>
-                  ))}
-                </div>
-
-                <Button 
-                  className="w-full bg-primary hover:bg-primary-hover text-white rounded-lg"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onNavigate('job-application', job.id.toString());
-                  }}
+            {adaptedJobs.length === 0 && (
+              <div className="text-center py-16">
+                <p className="text-secondary text-lg">No jobs found matching your criteria</p>
+                <Button
+                  onClick={clearFilters}
+                  className="mt-4 bg-primary hover:bg-primary-hover text-white rounded-lg"
                 >
-                  Apply Now
+                  Clear Filters
                 </Button>
               </div>
-            ))}
-          </div>
-        )}
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );

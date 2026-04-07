@@ -8,7 +8,7 @@ import { login } from '../api';
 
 interface LoginProps {
   onNavigate: (page: string) => void;
-  onLoginSuccess?: () => void; // ✅ Nouvelle prop
+  onLoginSuccess?: () => void;
 }
 
 export function Login({ onNavigate, onLoginSuccess }: LoginProps) {
@@ -27,13 +27,13 @@ export function Login({ onNavigate, onLoginSuccess }: LoginProps) {
 
     try {
       const result = await login(formData.email, formData.password);
-      
-      // ✅ Appelle le callback de succès si fourni
+
       if (onLoginSuccess) {
         onLoginSuccess();
       } else {
-        // Fallback : redirection manuelle
-        if (result.role === 'RECRUTEUR') {
+        if (result.role === 'ADMIN') {
+          onNavigate('admin-dashboard');
+        } else if (result.role === 'RECRUTEUR') {
           onNavigate('employer-dashboard');
         } else if (result.role === 'CANDIDAT') {
           onNavigate('candidate-dashboard');
@@ -61,9 +61,7 @@ export function Login({ onNavigate, onLoginSuccess }: LoginProps) {
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center px-4">
       <div className="max-w-md w-full max-h-[90vh]">
-        {/* Card */}
         <div className="bg-white rounded-2xl shadow-custom-lg border border-color p-6 sm:p-8 flex flex-col gap-6 h-full">
-          {/* Header with back + logo */}
           <div className="flex items-start justify-between">
             <button
               type="button"
@@ -86,9 +84,7 @@ export function Login({ onNavigate, onLoginSuccess }: LoginProps) {
             <div className="w-10" />
           </div>
 
-          {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6 flex-1">
-            {/* Email Field */}
             <div>
               <Label htmlFor="email" className="mb-2 block">
                 Email Address
@@ -108,7 +104,6 @@ export function Login({ onNavigate, onLoginSuccess }: LoginProps) {
               </div>
             </div>
 
-            {/* Password Field */}
             <div>
               <Label htmlFor="password" className="mb-2 block">
                 Password
@@ -128,7 +123,6 @@ export function Login({ onNavigate, onLoginSuccess }: LoginProps) {
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Checkbox
@@ -155,7 +149,6 @@ export function Login({ onNavigate, onLoginSuccess }: LoginProps) {
               </button>
             </div>
 
-            {/* Login Button */}
             <Button
               type="submit"
               disabled={submitting}
@@ -171,7 +164,6 @@ export function Login({ onNavigate, onLoginSuccess }: LoginProps) {
             )}
           </form>
 
-          {/* Footer area inside card */}
           <div className="mt-4 border-t border-color pt-4 space-y-3">
             <p className="text-center text-sm text-secondary">
               Don't have an account?{' '}

@@ -97,6 +97,21 @@ public class OffreService {
         if (offreDetails.getCompetencesRequises() != null) {
             offre.setCompetencesRequises(offreDetails.getCompetencesRequises());
         }
+        if (offreDetails.getCompany() != null) {
+            offre.setCompany(offreDetails.getCompany());
+        }
+        if (offreDetails.getCategory() != null) {
+            offre.setCategory(offreDetails.getCategory());
+        }
+        if (offreDetails.getExperienceLevel() != null) {
+            offre.setExperienceLevel(offreDetails.getExperienceLevel());
+        }
+        if (offreDetails.getSalaryMin() != null) {
+            offre.setSalaryMin(offreDetails.getSalaryMin());
+        }
+        if (offreDetails.getSalaryMax() != null) {
+            offre.setSalaryMax(offreDetails.getSalaryMax());
+        }
         if (offreDetails.getActive() != null) {
             offre.setActive(offreDetails.getActive());
         }
