@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/badge';
 import {
   getCVsWithScores,
   calculateMatchingScore,
-  updateCandidatureStatus,
+  updateCandidatureStatusNew,
   downloadCVFile,
   CandidateWithScore
 } from '../api';
@@ -26,27 +26,36 @@ function scoreColor(score: number) {
   return { text: 'text-red-600', bg: 'bg-red-100', bar: 'bg-red-400', label: 'Low' };
 }
 
+function isAccepted(statut: string) {
+  return statut === 'ACCEPTED' || statut === 'ACCEPTE';
+}
+
+function isRejected(statut: string) {
+  return statut === 'REJECTED' || statut === 'REFUSE';
+}
+
 function statusInfo(statut: string) {
-  switch (statut) {
-    case 'ACCEPTE':
-      return {
-        label: 'Accepted',
-        cls: 'bg-green-100 text-green-700',
-        icon: <CheckCircle className="h-4 w-4 text-green-600" />
-      };
-    case 'REFUSE':
-      return {
-        label: 'Rejected',
-        cls: 'bg-red-100 text-red-700',
-        icon: <XCircle className="h-4 w-4 text-red-500" />
-      };
-    default:
-      return {
-        label: 'Pending',
-        cls: 'bg-blue-100 text-blue-700',
-        icon: <Clock className="h-4 w-4 text-blue-500" />
-      };
+  if (isAccepted(statut)) {
+    return {
+      label: 'Accepted',
+      cls: 'bg-green-100 text-green-700',
+      icon: <CheckCircle className="h-4 w-4 text-green-600" />
+    };
   }
+
+  if (isRejected(statut)) {
+    return {
+      label: 'Rejected',
+      cls: 'bg-red-100 text-red-700',
+      icon: <XCircle className="h-4 w-4 text-red-500" />
+    };
+  }
+
+  return {
+    label: 'Pending',
+    cls: 'bg-blue-100 text-blue-700',
+    icon: <Clock className="h-4 w-4 text-blue-500" />
+  };
 }
 
 function timeAgo(dateStr: string): string {
@@ -56,6 +65,7 @@ function timeAgo(dateStr: string): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
+
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
@@ -74,20 +84,19 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
 
   useEffect(() => {
     loadCandidates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offerId]);
 
   const loadCandidates = async () => {
     try {
       setLoading(true);
       const data = await getCVsWithScores(Number(offerId));
-      console.log('📋 Candidates with scores:', data);
       setCandidates(data);
 
       const token = localStorage.getItem('authToken');
-      const offerResponse = await fetch(
-        `http://localhost:8080/api/offres/${offerId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const offerResponse = await fetch(`http://localhost:8080/api/offres/${offerId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       const offer = await offerResponse.json();
       setOfferTitle(offer.titre);
     } catch (err) {
@@ -103,13 +112,11 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
       const token = localStorage.getItem('authToken');
 
       for (const candidate of candidates) {
-        console.log(`📄 Re-extracting text for CV ${candidate.cv.id}...`);
         await fetch(`http://localhost:8080/api/cv/${candidate.cv.id}/reextract`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        console.log(`🤖 Calculating score for CV ${candidate.cv.id}...`);
         try {
           await calculateMatchingScore(candidate.cv.id);
         } catch (err) {
@@ -130,12 +137,11 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
   const handleUpdateStatus = async (cvId: number, statut: 'ACCEPTED' | 'REJECTED') => {
     try {
       setUpdatingStatus(cvId);
-      const apiStatut = statut === 'ACCEPTED' ? 'ACCEPTE' : 'REFUSE';
-      await updateCandidatureStatus(cvId, apiStatut);
+      await updateCandidatureStatusNew(cvId, statut);
       await loadCandidates();
     } catch (err) {
       console.error('Failed to update status:', err);
-      alert('Error updating status');
+      alert(err instanceof Error ? err.message : 'Error updating status');
     } finally {
       setUpdatingStatus(null);
     }
@@ -302,9 +308,9 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                 const { cv, matchingScore } = candidate;
                 const status = statusInfo(cv.statut);
                 const isExpanded = expandedId === cv.id;
-                const sc = matchingScore
-                  ? scoreColor(Number(matchingScore.score))
-                  : null;
+                const sc = matchingScore ? scoreColor(Number(matchingScore.score)) : null;
+                const accepted = isAccepted(cv.statut);
+                const rejected = isRejected(cv.statut);
 
                 return (
                   <div key={cv.id} className="group">
@@ -315,9 +321,7 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                       onClick={() => setExpandedId(isExpanded ? null : cv.id)}
                     >
                       <div className="w-8 h-8 rounded-full bg-primary-light flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-bold text-primary">
-                          #{index + 1}
-                        </span>
+                        <span className="text-xs font-bold text-primary">#{index + 1}</span>
                       </div>
 
                       <div className="w-11 h-11 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
@@ -378,11 +382,49 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                         </Badge>
                       )}
 
+                      <div
+                        className="flex items-center gap-2 flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          onClick={() => handleUpdateStatus(cv.id, 'ACCEPTED')}
+                          disabled={updatingStatus === cv.id || accepted}
+                          variant="outline"
+                          className="border-green-600 text-green-600 hover:bg-green-50 rounded-lg px-3 py-2"
+                          title="Accept"
+                          aria-label="Accept"
+                        >
+                          {updatingStatus === cv.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                          )}
+                          Accept
+                        </Button>
+
+                        <Button
+                          onClick={() => handleUpdateStatus(cv.id, 'REJECTED')}
+                          disabled={updatingStatus === cv.id || rejected}
+                          variant="outline"
+                          className="border-red-600 text-red-600 hover:bg-red-50 rounded-lg px-3 py-2"
+                          title="Reject"
+                          aria-label="Reject"
+                        >
+                          {updatingStatus === cv.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mr-1" />
+                          )}
+                          Reject
+                        </Button>
+                      </div>
+
                       <div className="flex-shrink-0">
-                        {isExpanded
-                          ? <ChevronUp className="h-5 w-5 text-muted" />
-                          : <ChevronDown className="h-5 w-5 text-muted group-hover:text-primary transition-colors" />
-                        }
+                        {isExpanded ? (
+                          <ChevronUp className="h-5 w-5 text-muted" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-muted group-hover:text-primary transition-colors" />
+                        )}
                       </div>
                     </div>
 
@@ -395,6 +437,7 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                                 <User className="h-4 w-4 text-primary" />
                                 Candidate Information
                               </h4>
+
                               <div className="bg-white rounded-lg p-4 space-y-2">
                                 <div className="flex justify-between text-sm">
                                   <span className="text-secondary">Full Name</span>
@@ -430,53 +473,6 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                                 </div>
                               </div>
                             </div>
-
-                            {matchingScore && (
-                              <div>
-                                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                  <Sparkles className="h-4 w-4 text-primary" />
-                                  AI Skill Analysis
-                                </h4>
-                                <div className="space-y-3">
-                                  <div className="bg-white rounded-lg p-4">
-                                    <p className="text-xs font-semibold text-green-700 mb-2 flex items-center gap-1">
-                                      <CheckCircle className="h-3.5 w-3.5" />
-                                      Matched Skills
-                                    </p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {(matchingScore.matchedSkills || 'None')
-                                        .split(',')
-                                        .map((skill, i) => (
-                                          <span
-                                            key={i}
-                                            className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full"
-                                          >
-                                            {skill.trim()}
-                                          </span>
-                                        ))}
-                                    </div>
-                                  </div>
-                                  <div className="bg-white rounded-lg p-4">
-                                    <p className="text-xs font-semibold text-red-700 mb-2 flex items-center gap-1">
-                                      <XCircle className="h-3.5 w-3.5" />
-                                      Missing Skills
-                                    </p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {(matchingScore.missingSkills || 'None')
-                                        .split(',')
-                                        .map((skill, i) => (
-                                          <span
-                                            key={i}
-                                            className="text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded-full"
-                                          >
-                                            {skill.trim()}
-                                          </span>
-                                        ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
                           </div>
 
                           <div>
@@ -496,6 +492,7 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                                   View CV File
                                 </Button>
                               </a>
+
                               <Button
                                 variant="outline"
                                 className="border-color rounded-lg"
@@ -505,10 +502,11 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                                   handleDownload(cv.id, cv.nomFichier);
                                 }}
                               >
-                                {downloadingId === cv.id
-                                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                                  : <Download className="h-4 w-4" />
-                                }
+                                {downloadingId === cv.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Download className="h-4 w-4" />
+                                )}
                               </Button>
                             </div>
 
@@ -516,6 +514,7 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                               <Eye className="h-4 w-4 text-primary" />
                               CV Content Preview
                             </h4>
+
                             <div className="bg-white rounded-lg p-4 max-h-64 overflow-y-auto">
                               {cv.texteExtrait ? (
                                 <pre className="text-xs text-secondary whitespace-pre-wrap font-sans leading-relaxed">
@@ -530,72 +529,15 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
                                 </div>
                               )}
                             </div>
-
-                            {matchingScore && sc && (
-                              <div className="mt-4 bg-white rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm font-semibold">
-                                    AI Match Score
-                                  </span>
-                                  <span className={`text-2xl font-bold ${sc.text}`}>
-                                    {Number(matchingScore.score).toFixed(0)}%
-                                  </span>
-                                </div>
-                                <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full ${sc.bar} transition-all`}
-                                    style={{ width: `${matchingScore.score}%` }}
-                                  />
-                                </div>
-                                <div className="flex justify-between text-xs text-muted mt-1">
-                                  <span>0%</span>
-                                  <span>50%</span>
-                                  <span>100%</span>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between mt-6 pt-4 border-t border-color/50">
                           <div className="flex items-center gap-2 text-sm text-secondary">
                             {status.icon}
-                            <span>Current status: <strong>{status.label}</strong></span>
-                          </div>
-                          <div className="flex gap-3">
-                            {cv.statut !== 'ACCEPTE' && (
-                              <Button
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  handleUpdateStatus(cv.id, 'ACCEPTED');
-                                }}
-                                disabled={updatingStatus === cv.id}
-                                className="bg-green-600 hover:bg-green-700 text-white rounded-lg"
-                              >
-                                {updatingStatus === cv.id
-                                  ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                  : <CheckCircle className="h-4 w-4 mr-1" />
-                                }
-                                Accept
-                              </Button>
-                            )}
-                            {cv.statut !== 'REFUSE' && (
-                              <Button
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  handleUpdateStatus(cv.id, 'REJECTED');
-                                }}
-                                disabled={updatingStatus === cv.id}
-                                variant="outline"
-                                className="border-red-600 text-red-600 hover:bg-red-50 rounded-lg"
-                              >
-                                {updatingStatus === cv.id
-                                  ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                  : <XCircle className="h-4 w-4 mr-1" />
-                                }
-                                Reject
-                              </Button>
-                            )}
+                            <span>
+                              Current status: <strong>{status.label}</strong>
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -606,6 +548,7 @@ export function OfferCandidates({ offerId, onNavigate }: OfferCandidatesProps) {
             </div>
           )}
         </div>
+
       </div>
     </div>
   );

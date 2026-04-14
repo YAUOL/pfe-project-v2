@@ -11,7 +11,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { useState, useEffect } from 'react';
-import { getAllOffres, OffreDTO } from '../api';
+import { getAllOffres, OffreDTO, getMesCVs, CVDTO } from '../api';
 
 interface JobDetailProps {
   jobId: string;
@@ -22,14 +22,19 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
   const [job, setJob] = useState<OffreDTO | null>(null);
   const [relatedJobs, setRelatedJobs] = useState<OffreDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [checkingApplication, setCheckingApplication] = useState(true);
 
   useEffect(() => {
-    loadJobData();
+    loadJobDataAndCheckApplication();
   }, [jobId]);
 
-  const loadJobData = async () => {
+  const loadJobDataAndCheckApplication = async () => {
     try {
       setLoading(true);
+      setCheckingApplication(true);
+      setHasApplied(false);
+
       const offres = await getAllOffres();
 
       const currentJob = offres.find(o => o.id.toString() === jobId);
@@ -45,11 +50,29 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
           .slice(0, 3);
 
         setRelatedJobs(similar);
+      } else {
+        setRelatedJobs([]);
+      }
+
+      // Check if logged-in candidate already applied
+      const token = localStorage.getItem('authToken');
+      const role = localStorage.getItem('authRole');
+
+      if (token && role === 'CANDIDAT' && currentJob) {
+        try {
+          const mesCVs: CVDTO[] = await getMesCVs();
+          const alreadyApplied = mesCVs.some(cv => cv.offre.id.toString() === jobId);
+          setHasApplied(alreadyApplied);
+        } catch (err) {
+          console.error('Failed to check applications:', err);
+          setHasApplied(false);
+        }
       }
     } catch (err) {
       console.error('Failed to load job:', err);
     } finally {
       setLoading(false);
+      setCheckingApplication(false);
     }
   };
 
@@ -79,6 +102,9 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
     ? job.competencesRequises.split(',').map(skill => skill.trim()).filter(Boolean)
     : [];
 
+  const isCandidate = localStorage.getItem('authRole') === 'CANDIDAT';
+  const isLoggedIn = !!localStorage.getItem('authToken');
+
   return (
     <div className="bg-surface min-h-screen py-8 px-4">
       <div className="max-w-7xl mx-auto">
@@ -102,6 +128,7 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
                     <span className="text-lg font-medium">{job.company}</span>
                   </div>
                 </div>
+
                 {job.active && (
                   <Badge className="bg-primary-light text-primary border-0">
                     Featured
@@ -129,12 +156,34 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  onClick={() => onNavigate('job-application', jobId)}
-                  className="flex-1 bg-primary hover:bg-primary-hover text-white rounded-lg py-6"
-                >
-                  Apply Now
-                </Button>
+                {isCandidate ? (
+                  <Button
+                    onClick={() => onNavigate('job-application', jobId)}
+                    disabled={hasApplied || checkingApplication}
+                    className="flex-1 bg-primary hover:bg-primary-hover text-white rounded-lg py-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {checkingApplication
+                      ? 'Checking...'
+                      : hasApplied
+                        ? 'Already Applied'
+                        : 'Apply Now'}
+                  </Button>
+                ) : isLoggedIn ? (
+                  <Button
+                    disabled
+                    className="flex-1 bg-gray-400 text-white rounded-lg py-6 cursor-not-allowed"
+                  >
+                    Recruiters cannot apply
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => onNavigate('login')}
+                    className="flex-1 bg-primary hover:bg-primary-hover text-white rounded-lg py-6"
+                  >
+                    Login to Apply
+                  </Button>
+                )}
+
                 <Button
                   variant="outline"
                   className="rounded-lg border-color hover:bg-primary-light hover:border-primary"
@@ -150,6 +199,12 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
                   Share
                 </Button>
               </div>
+
+              {hasApplied && isCandidate && (
+                <p className="mt-3 text-sm text-green-600">
+                  ✓ You have already applied to this job
+                </p>
+              )}
             </div>
 
             <div className="bg-white rounded-xl border border-color p-8">
@@ -248,7 +303,9 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
                   <h3 className="mb-2">{relatedJob.titre}</h3>
                   <p className="text-sm text-secondary mb-2">{relatedJob.company}</p>
                   <p className="text-sm text-muted mb-1">{relatedJob.localisation}</p>
-                  <p className="text-sm text-muted">${relatedJob.salaryMin}k - ${relatedJob.salaryMax}k</p>
+                  <p className="text-sm text-muted">
+                    ${relatedJob.salaryMin}k - ${relatedJob.salaryMax}k
+                  </p>
                   <Button
                     className="w-full mt-4 bg-primary hover:bg-primary-hover text-white rounded-lg"
                     onClick={(e) => {

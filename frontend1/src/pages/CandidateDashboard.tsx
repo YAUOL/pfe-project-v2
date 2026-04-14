@@ -8,7 +8,8 @@ import {
   Mail,
   Briefcase,
   TrendingUp,
-  Eye
+  Eye,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -19,9 +20,27 @@ interface CandidateDashboardProps {
   onNavigate: (page: string, jobId?: string) => void;
 }
 
+type OffreStatus = 'ACTIVE' | 'UPDATED' | 'CLOSED' | 'DELETED' | string | undefined;
+
+function getOfferStateInfo(offre?: Partial<OffreDTO>) {
+  const status = (offre?.status as OffreStatus) ?? (offre?.active ? 'ACTIVE' : 'CLOSED');
+
+  if (status === 'DELETED') {
+    return { label: 'Offer Deleted', cls: 'bg-red-100 text-red-700' };
+  }
+  if (status === 'UPDATED') {
+    return { label: 'Offer Updated', cls: 'bg-orange-100 text-orange-700' };
+  }
+  if (status === 'CLOSED' || offre?.active === false) {
+    return { label: 'Offer Closed', cls: 'bg-gray-100 text-gray-700' };
+  }
+  return null;
+}
+
 export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
   const [applications, setApplications] = useState<CVDTO[]>([]);
   const [availableJobs, setAvailableJobs] = useState<OffreDTO[]>([]);
+  const [offresById, setOffresById] = useState<Record<number, OffreDTO>>({});
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState('');
 
@@ -37,12 +56,17 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
       setUserEmail(email);
 
       const mesCVs = await getMesCVs();
-      console.log('📋 Mes CVs:', mesCVs);
       setApplications(mesCVs);
 
       const offres = await getAllOffres();
-      console.log('💼 Offres disponibles:', offres);
-      setAvailableJobs(offres.slice(0, 4));
+      const byId = Object.fromEntries(offres.map(o => [o.id, o])) as Record<number, OffreDTO>;
+      setOffresById(byId);
+
+      const publicOffres = offres
+        .filter(o => o.active && o.status !== 'DELETED')
+        .slice(0, 4);
+
+      setAvailableJobs(publicOffres);
     } catch (err) {
       console.error('❌ Failed to load data:', err);
     } finally {
@@ -52,12 +76,14 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
 
   const getStatusInfo = (status: string) => {
     switch (status) {
+      case 'ACCEPTED':
       case 'ACCEPTE':
         return {
           icon: <CheckCircle className="h-4 w-4 text-green-600" />,
           color: 'bg-green-100 text-green-700',
           label: 'Accepted',
         };
+      case 'REJECTED':
       case 'REFUSE':
         return {
           icon: <XCircle className="h-4 w-4 text-red-600" />,
@@ -76,16 +102,17 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
   const getInitials = (email: string) => {
     if (!email) return 'U';
     const parts = email.split('@')[0].split('.');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return email[0].toUpperCase();
   };
 
-  const acceptedCount = applications.filter(app => app.statut === 'ACCEPTE').length;
-  const rejectedCount = applications.filter(app => app.statut === 'REFUSE').length;
-  const pendingCount = applications.filter(
-    app => app.statut !== 'ACCEPTE' && app.statut !== 'REFUSE'
+  const acceptedCount = applications.filter(app => app.statut === 'ACCEPTED' || app.statut === 'ACCEPTE').length;
+  const rejectedCount = applications.filter(app => app.statut === 'REJECTED' || app.statut === 'REFUSE').length;
+  const pendingCount = applications.filter(app =>
+    app.statut !== 'ACCEPTED' &&
+    app.statut !== 'ACCEPTE' &&
+    app.statut !== 'REJECTED' &&
+    app.statut !== 'REFUSE'
   ).length;
 
   if (loading) {
@@ -115,13 +142,11 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
 
       <main className="flex-1 bg-surface min-h-screen p-4 lg:p-8">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="mb-8">
             <h1 className="mb-2">Candidate Dashboard</h1>
             <p className="text-secondary">Track your applications and discover new opportunities</p>
           </div>
 
-          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-white rounded-xl border border-color p-6">
               <div className="flex items-center justify-between mb-4">
@@ -210,10 +235,22 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
                   <tbody>
                     {applications.map((application) => {
                       const status = getStatusInfo(application.statut);
+                      const fullOffre = offresById[application.offre.id];
+                      const offerState = getOfferStateInfo(fullOffre);
 
                       return (
                         <tr key={application.id} className="border-b border-color last:border-0">
-                          <td className="py-4 px-2 font-medium">{application.offre.titre}</td>
+                          <td className="py-4 px-2 font-medium">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span>{application.offre.titre}</span>
+                              {offerState && (
+                                <Badge className={`${offerState.cls} border-0`}>
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  {offerState.label}
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-4 px-2 text-secondary">{application.nomFichier}</td>
                           <td className="py-4 px-2">
                             <Badge className={`${status.color} border-0 flex items-center gap-1 w-fit`}>
@@ -244,9 +281,8 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
             )}
           </div>
 
-          {/* Available Jobs + Profile/Quick Actions */}
+          {/* Available Jobs */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Available Jobs */}
             <div className="lg:col-span-2">
               <div className="bg-white rounded-xl border border-color p-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
@@ -276,46 +312,52 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {availableJobs.map((job) => (
-                      <div
-                        key={job.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface rounded-lg gap-4 hover:bg-primary-light/50 transition-colors"
-                      >
-                        <div className="flex-1">
-                          <h4 className="mb-1">{job.titre}</h4>
-                          <p className="text-sm text-secondary mb-2">{job.description}</p>
-                          <div className="flex flex-wrap gap-2 text-xs text-muted">
-                            <span>{job.localisation}</span>
-                            <span>•</span>
-                            <span>{job.typeContrat}</span>
+                    {availableJobs.map((job) => {
+                      const offerState = getOfferStateInfo(job);
+                      return (
+                        <div
+                          key={job.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface rounded-lg gap-4 hover:bg-primary-light/50 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="mb-0">{job.titre}</h4>
+                              {offerState && offerState.label === 'Offer Updated' && (
+                                <Badge className={`${offerState.cls} border-0`}>{offerState.label}</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-secondary mb-2">{job.description}</p>
+                            <div className="flex flex-wrap gap-2 text-xs text-muted">
+                              <span>{job.localisation}</span>
+                              <span>•</span>
+                              <span>{job.typeContrat}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              className="rounded-lg"
+                              onClick={() => onNavigate('job-detail', job.id.toString())}
+                            >
+                              View
+                            </Button>
+                            <Button
+                              className="bg-primary hover:bg-primary-hover text-white rounded-lg"
+                              onClick={() => onNavigate('job-application', job.id.toString())}
+                            >
+                              Apply Now
+                            </Button>
                           </div>
                         </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            className="rounded-lg"
-                            onClick={() => onNavigate('job-detail', job.id.toString())}
-                          >
-                            View
-                          </Button>
-                          <Button
-                            className="bg-primary hover:bg-primary-hover text-white rounded-lg"
-                            onClick={() => onNavigate('job-application', job.id.toString())}
-                          >
-                            Apply Now
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Sidebar */}
             <div className="space-y-6">
-              {/* Profile Card */}
               <div className="bg-white rounded-xl border border-color p-6">
                 <div className="text-center mb-6">
                   <div className="w-24 h-24 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4">
@@ -325,9 +367,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
                   </div>
                   <h3 className="mb-1">{userEmail.split('@')[0] || 'Candidate'}</h3>
                   <p className="text-secondary text-sm mb-4">Candidate</p>
-                  <Badge className="bg-green-100 text-green-700 border-0">
-                    Active
-                  </Badge>
+                  <Badge className="bg-green-100 text-green-700 border-0">Active</Badge>
                 </div>
 
                 <div className="space-y-3 mb-6">
@@ -354,38 +394,6 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
                 </Button>
               </div>
 
-              {/* Quick Actions */}
-              <div className="bg-white rounded-xl border border-color p-6">
-                <h3 className="mb-4">Quick Actions</h3>
-                <div className="space-y-3">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start border-color rounded-lg hover:bg-primary-light hover:border-primary"
-                    onClick={() => onNavigate('job-listings')}
-                  >
-                    <Briefcase className="h-4 w-4 mr-2" />
-                    Browse Jobs
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start border-color rounded-lg hover:bg-primary-light hover:border-primary"
-                    onClick={() => onNavigate('my-applications')}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    My Applications
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start border-color rounded-lg hover:bg-primary-light hover:border-primary"
-                    onClick={() => onNavigate('saved-jobs')}
-                  >
-                    <Bookmark className="h-4 w-4 mr-2" />
-                    Saved Jobs
-                  </Button>
-                </div>
-              </div>
-
-              {/* Summary Card */}
               <div className="bg-primary-light rounded-xl p-6">
                 <h3 className="mb-3 text-primary">Application Summary</h3>
                 <ul className="space-y-2 text-sm text-secondary">
@@ -405,6 +413,7 @@ export function CandidateDashboard({ onNavigate }: CandidateDashboardProps) {
               </div>
             </div>
           </div>
+
         </div>
       </main>
     </div>

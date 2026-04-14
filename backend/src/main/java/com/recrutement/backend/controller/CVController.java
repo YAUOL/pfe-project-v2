@@ -3,6 +3,7 @@ package com.recrutement.backend.controller;
 import com.recrutement.backend.model.CV;
 import com.recrutement.backend.model.MatchingScore;
 import com.recrutement.backend.model.Offre;
+import com.recrutement.backend.model.Role;
 import com.recrutement.backend.model.Utilisateur;
 import com.recrutement.backend.service.CVService;
 import com.recrutement.backend.service.MatchingScoreService;
@@ -14,6 +15,7 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,11 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -40,9 +38,10 @@ public class CVController {
     private final MatchingScoreService matchingScoreService;
 
     // ─────────────────────────────────────────────
-    // POST upload CV
+    // POST upload CV (Candidate only)
     // ─────────────────────────────────────────────
     @PostMapping("/upload")
+    @PreAuthorize("hasRole('CANDIDAT')")
     public ResponseEntity<?> uploadCV(
             @RequestParam("file") MultipartFile file,
             @RequestParam("offreId") Long offreId,
@@ -64,7 +63,7 @@ public class CVController {
 
             CV savedCV = cvService.uploadCV(file, candidat, offre);
 
-            // Auto-calculate matching score after upload
+            // Auto-calculate matching score after upload (non-blocking)
             try {
                 matchingScoreService.calculateAndSave(savedCV.getId());
                 System.out.println("[UPLOAD] Score calculated for CV " + savedCV.getId());
@@ -83,9 +82,10 @@ public class CVController {
     }
 
     // ─────────────────────────────────────────────
-    // GET CVs for an offer
+    // GET CVs for an offer (Recruiter/Admin)
     // ─────────────────────────────────────────────
     @GetMapping("/offre/{offreId}")
+    @PreAuthorize("hasRole('RECRUTEUR') or hasRole('ADMIN')")
     public ResponseEntity<?> getCVsByOffre(@PathVariable Long offreId) {
         try {
             Offre offre = offreService.getOffreById(offreId);
@@ -110,9 +110,10 @@ public class CVController {
     }
 
     // ─────────────────────────────────────────────
-    // GET CVs with scores (sorted by score DESC)
+    // GET CVs with scores (sorted by score DESC) (Recruiter/Admin)
     // ─────────────────────────────────────────────
     @GetMapping("/offre/{offreId}/with-scores")
+    @PreAuthorize("hasRole('RECRUTEUR') or hasRole('ADMIN')")
     public ResponseEntity<?> getCVsWithScores(@PathVariable Long offreId) {
         try {
             Offre offre = offreService.getOffreById(offreId);
@@ -135,8 +136,7 @@ public class CVController {
                     scoreMap.put("score", ms.getScore());
                     scoreMap.put("matchedSkills", ms.getMatchedSkills());
                     scoreMap.put("missingSkills", ms.getMissingSkills());
-                    scoreMap.put("createdAt", ms.getCreatedAt() != null
-                            ? ms.getCreatedAt().toString() : null);
+                    scoreMap.put("createdAt", ms.getCreatedAt() != null ? ms.getCreatedAt().toString() : null);
                     item.put("matchingScore", scoreMap);
                 } else {
                     item.put("matchingScore", null);
@@ -168,9 +168,10 @@ public class CVController {
     }
 
     // ─────────────────────────────────────────────
-    // GET mes CVs
+    // GET mes CVs (Candidate only)
     // ─────────────────────────────────────────────
     @GetMapping("/mes-cvs")
+    @PreAuthorize("hasRole('CANDIDAT')")
     public ResponseEntity<?> getMesCVs(Authentication authentication) {
         try {
             String email = authentication.getName();
@@ -191,24 +192,54 @@ public class CVController {
     }
 
     // ─────────────────────────────────────────────
-    // PUT update status
+    // PUT update status (Recruiter/Admin only + ownership check)
+    // Expected values: PENDING / ACCEPTED / REJECTED
     // ─────────────────────────────────────────────
     @PutMapping("/{cvId}/status")
+    @PreAuthorize("hasRole('RECRUTEUR') or hasRole('ADMIN')")
     public ResponseEntity<?> updateStatus(
             @PathVariable Long cvId,
-            @RequestBody Map<String, String> body
+            @RequestBody Map<String, String> body,
+            Authentication authentication
     ) {
         try {
+            if (authentication == null) {
+                return ResponseEntity.status(401).body("Unauthorized");
+            }
+
             CV cv = cvService.getCVById(cvId);
             if (cv == null) {
                 return ResponseEntity.status(404).body("CV not found");
             }
 
-            String statut = body.get("statut");
-            cv.setStatut(CV.StatutCandidature.valueOf(statut));
+            String statutStr = body.get("statut");
+            if (statutStr == null || statutStr.isBlank()) {
+                return ResponseEntity.badRequest().body("Missing 'statut' field");
+            }
+
+            CV.StatutCandidature newStatus;
+            try {
+                newStatus = CV.StatutCandidature.valueOf(statutStr.toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.badRequest().body("Invalid status. Allowed: PENDING, ACCEPTED, REJECTED");
+            }
+
+            String email = authentication.getName();
+            Utilisateur actor = utilisateurService.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+            // If recruiter: must own the offer linked to this CV
+            if (actor.getRole() == Role.RECRUTEUR) {
+                String offerOwnerEmail = cv.getOffre().getRecruteur().getEmail();
+                if (!email.equals(offerOwnerEmail)) {
+                    return ResponseEntity.status(403).body("Forbidden: not your offer");
+                }
+            }
+
+            cv.setStatut(newStatus);
             cvService.save(cv);
 
-            System.out.println("[STATUS] CV " + cvId + " → " + statut);
+            System.out.println("[STATUS] CV " + cvId + " → " + newStatus.name());
             return ResponseEntity.ok("Status updated");
 
         } catch (Exception e) {
@@ -218,9 +249,10 @@ public class CVController {
     }
 
     // ─────────────────────────────────────────────
-    // POST re-extract text from CV file
+    // POST re-extract text from CV file (Recruiter/Admin)
     // ─────────────────────────────────────────────
     @PostMapping("/{cvId}/reextract")
+    @PreAuthorize("hasRole('RECRUTEUR') or hasRole('ADMIN')")
     public ResponseEntity<?> reExtractText(@PathVariable Long cvId) {
         try {
             CV cv = cvService.reExtractText(cvId);
@@ -234,6 +266,7 @@ public class CVController {
 
     // ─────────────────────────────────────────────
     // GET download/view CV file
+    // (kept as authenticated-only by SecurityConfig; access depends on your global security rules)
     // ─────────────────────────────────────────────
     @GetMapping("/{cvId}/file")
     public ResponseEntity<Resource> downloadCVFile(@PathVariable Long cvId) {
@@ -283,10 +316,8 @@ public class CVController {
         map.put("nomFichier", cv.getNomFichier());
         map.put("cheminFichier", cv.getCheminFichier());
         map.put("texteExtrait", cv.getTexteExtrait());
-        map.put("uploadedAt", cv.getUploadedAt() != null
-                ? cv.getUploadedAt().toString() : null);
-        map.put("statut", cv.getStatut() != null
-                ? cv.getStatut().name() : "PENDING");
+        map.put("uploadedAt", cv.getUploadedAt() != null ? cv.getUploadedAt().toString() : null);
+        map.put("statut", cv.getStatut() != null ? cv.getStatut().name() : "PENDING");
 
         Map<String, Object> candidatMap = new HashMap<>();
         if (cv.getCandidat() != null) {
@@ -306,4 +337,55 @@ public class CVController {
 
         return map;
     }
+// ─────────────────────────────────────────────
+// POST calculate match score for a CV (Recruiter/Admin + ownership check)
+// Endpoint used by frontend: /api/cv/calculate-match/{cvId}
+// ─────────────────────────────────────────────
+@PostMapping("/calculate-match/{cvId}")
+@PreAuthorize("hasRole('RECRUTEUR') or hasRole('ADMIN')")
+public ResponseEntity<?> calculateMatchForCv(
+        @PathVariable Long cvId,
+        Authentication authentication
+) {
+    try {
+        if (authentication == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        CV cv = cvService.getCVById(cvId);
+        if (cv == null) {
+            return ResponseEntity.status(404).body("CV not found");
+        }
+
+        String email = authentication.getName();
+        Utilisateur actor = utilisateurService.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        // If recruiter: must own the offer linked to this CV
+        if (actor.getRole() == Role.RECRUTEUR) {
+            String offerOwnerEmail = cv.getOffre().getRecruteur().getEmail();
+            if (!email.equals(offerOwnerEmail)) {
+                return ResponseEntity.status(403).body("Forbidden: not your offer");
+            }
+        }
+
+        MatchingScore score = matchingScoreService.calculateAndSave(cvId);
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", score.getId());
+        map.put("score", score.getScore());
+        map.put("matchedSkills", score.getMatchedSkills());
+        map.put("missingSkills", score.getMissingSkills());
+        map.put("createdAt", score.getCreatedAt() != null ? score.getCreatedAt().toString() : null);
+
+        return ResponseEntity.ok(map);
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(500).body("Error: " + e.getMessage());
+    }
+}
+
+
+
 }

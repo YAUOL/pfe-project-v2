@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,15 +42,23 @@ public class OffreService {
 
     public List<Offre> getActiveOffres() {
         log.info("✅ Récupération des offres actives");
-        return offreRepository.findByActiveTrue();
+        // Exclure celles marquées supprimées (status = DELETED)
+        return offreRepository.findByActiveTrue()
+                .stream()
+                .filter(o -> !"DELETED".equalsIgnoreCase(o.getStatus()))
+                .collect(Collectors.toList());
     }
 
     public List<Offre> searchOffres(String keyword) {
         log.info("🔎 Recherche d'offres avec le mot-clé: {}", keyword);
         if (keyword == null || keyword.trim().isEmpty()) {
-            return getAllOffres();
+            return getAllOffres().stream()
+                    .filter(o -> !"DELETED".equalsIgnoreCase(o.getStatus()))
+                    .collect(Collectors.toList());
         }
-        return offreRepository.searchByKeyword(keyword);
+        return offreRepository.searchByKeyword(keyword).stream()
+                .filter(o -> !"DELETED".equalsIgnoreCase(o.getStatus()))
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -67,8 +76,15 @@ public class OffreService {
         if (offre.getActive() == null) {
             offre.setActive(true);
         }
-
-        offre.setCreatedAt(LocalDateTime.now());
+        if (offre.getCreatedAt() == null) {
+            offre.setCreatedAt(LocalDateTime.now());
+        }
+        if (offre.getUpdatedAt() == null) {
+            offre.setUpdatedAt(offre.getCreatedAt());
+        }
+        if (offre.getStatus() == null) {
+            offre.setStatus("ACTIVE");
+        }
 
         Offre savedOffre = offreRepository.save(offre);
         log.info("✅ Offre créée avec succès, id: {}", savedOffre.getId());
@@ -116,6 +132,10 @@ public class OffreService {
             offre.setActive(offreDetails.getActive());
         }
 
+        // Mark as UPDATED so candidates can see it changed
+        offre.setStatus("UPDATED");
+        offre.setUpdatedAt(LocalDateTime.now());
+
         Offre updatedOffre = offreRepository.save(offre);
         log.info("✅ Offre mise à jour avec succès, id: {}", updatedOffre.getId());
 
@@ -124,7 +144,7 @@ public class OffreService {
 
     @Transactional
     public void deleteOffre(Long id) {
-        log.info("🗑️ Début de suppression de l'offre id: {}", id);
+        log.info("🗑️ Soft delete de l'offre id: {}", id);
 
         Offre offre = offreRepository.findById(id)
                 .orElseThrow(() -> {
@@ -132,11 +152,13 @@ public class OffreService {
                     return new RuntimeException("Offre non trouvée avec l'id: " + id);
                 });
 
-        log.info("📄 Offre à supprimer - Titre: '{}', ID: {}", offre.getTitre(), offre.getId());
+        // Soft delete: conserver l'offre pour l'historique candidat
+        offre.setActive(false);
+        offre.setStatus("DELETED");
+        offre.setUpdatedAt(LocalDateTime.now());
+        offreRepository.save(offre);
 
-        offreRepository.delete(offre);
-
-        log.info("✅ Offre {} supprimée avec succès", id);
+        log.info("✅ Offre {} marquée comme supprimée (soft delete)", id);
     }
 
     @Transactional
@@ -144,10 +166,17 @@ public class OffreService {
         log.info("🔄 Changement du statut de l'offre id: {}", id);
 
         Offre offre = getOffreById(id);
-        offre.setActive(!offre.getActive());
+        boolean newActive = !Boolean.TRUE.equals(offre.getActive());
+        offre.setActive(newActive);
+
+        // Ne pas écraser l'état DELETED
+        if (!"DELETED".equalsIgnoreCase(offre.getStatus())) {
+            offre.setStatus(newActive ? "ACTIVE" : "CLOSED");
+            offre.setUpdatedAt(LocalDateTime.now());
+        }
 
         Offre updatedOffre = offreRepository.save(offre);
-        log.info("✅ Statut de l'offre {} changé à: {}", id, updatedOffre.getActive());
+        log.info("✅ Statut de l'offre {}: active={}, status={}", id, updatedOffre.getActive(), updatedOffre.getStatus());
 
         return updatedOffre;
     }
@@ -160,5 +189,29 @@ public class OffreService {
     public long countActiveOffres() {
         log.info("📊 Comptage des offres actives");
         return offreRepository.countActiveOffres();
+    }
+
+    @Transactional
+    public Offre setOffreActive(Long offreId, boolean active, String actorEmail) {
+
+        Offre offre = getOffreById(offreId);
+
+        Utilisateur actor = utilisateurRepository.findByEmail(actorEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + actorEmail));
+
+        // Recruiter can only change his own offers
+        if (actor.getRole() == com.recrutement.backend.model.Role.RECRUTEUR) {
+            String ownerEmail = offre.getRecruteur().getEmail();
+            if (!actorEmail.equals(ownerEmail)) {
+                throw new RuntimeException("Forbidden: not your offer");
+            }
+        }
+
+        offre.setActive(active);
+        if (!"DELETED".equalsIgnoreCase(offre.getStatus())) {
+            offre.setStatus(active ? "ACTIVE" : "CLOSED");
+            offre.setUpdatedAt(LocalDateTime.now());
+        }
+        return offreRepository.save(offre);
     }
 }

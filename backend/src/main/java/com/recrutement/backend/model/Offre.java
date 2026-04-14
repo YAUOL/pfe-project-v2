@@ -40,6 +40,14 @@ public class Offre {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    // NEW: track last change (no enum/class added)
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    // NEW: textual state: ACTIVE | UPDATED | CLOSED | DELETED
+    @Column(name = "status", length = 20, nullable = false)
+    private String status;
+
     @Column(nullable = false)
     private String company;
 
@@ -73,8 +81,14 @@ public class Offre {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
+        if (updatedAt == null) {
+            updatedAt = createdAt;
+        }
         if (active == null) {
             active = true;
+        }
+        if (status == null) {
+            status = "ACTIVE";
         }
         if (cvs == null) {
             cvs = new ArrayList<>();
@@ -82,5 +96,10 @@ public class Offre {
         if (matchingScores == null) {
             matchingScores = new ArrayList<>();
         }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }

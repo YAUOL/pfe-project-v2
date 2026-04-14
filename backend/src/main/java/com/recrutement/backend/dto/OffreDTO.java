@@ -19,4 +19,8 @@ public class OffreDTO {
     private Integer salaryMax;
     private boolean active;
     private LocalDateTime createdAt;
+
+    // NEW: no enum, simple String + timestamp
+    private String status;       // ACTIVE | UPDATED | CLOSED | DELETED
+    private LocalDateTime updatedAt;
 }

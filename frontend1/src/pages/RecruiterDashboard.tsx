@@ -7,7 +7,11 @@ import {
   MoreVertical,
   Edit,
   Trash2,
-  Loader2
+  Loader2,
+  CheckCircle,
+  XCircle,
+  Power,
+  Clock,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -30,6 +34,8 @@ import {
   getMesOffres,
   getCVsByOffre,
   deleteOffre,
+  toggleOffreStatus,
+  updateCandidatureStatusNew,
   OffreDTO,
   CVDTO
 } from '../api';
@@ -46,7 +52,10 @@ export function RecruiterDashboard({ onNavigate }: RecruiterDashboardProps) {
   const [offres, setOffres] = useState<OfferWithApplications[]>([]);
   const [recentApplications, setRecentApplications] = useState<CVDTO[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [updatingCvId, setUpdatingCvId] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -79,9 +88,7 @@ export function RecruiterDashboard({ onNavigate }: RecruiterDashboardProps) {
         })
       );
 
-      allCVs.sort(
-        (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      );
+      allCVs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
 
       setOffres(offresWithApplications);
       setRecentApplications(allCVs.slice(0, 4));
@@ -102,28 +109,54 @@ export function RecruiterDashboard({ onNavigate }: RecruiterDashboardProps) {
       await loadData();
     } catch (err) {
       console.error('Delete failed:', err);
-      alert('Failed to delete offer');
+      alert(err instanceof Error ? err.message : 'Failed to delete offer');
     } finally {
       setDeletingId(null);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    return status === 'Active'
-      ? 'bg-green-100 text-green-700'
-      : 'bg-gray-100 text-gray-700';
+  const handleToggleOffre = async (offreId: number) => {
+    try {
+      setTogglingId(offreId);
+      await toggleOffreStatus(offreId);
+      await loadData();
+    } catch (err) {
+      console.error('Toggle offer failed:', err);
+      alert(err instanceof Error ? err.message : 'Failed to update offer status');
+    } finally {
+      setTogglingId(null);
+    }
   };
 
+  const handleDecisionApplication = async (cvId: number, statut: 'ACCEPTED' | 'REJECTED') => {
+    try {
+      setUpdatingCvId(cvId);
+      await updateCandidatureStatusNew(cvId, statut);
+      await loadData();
+    } catch (err) {
+      console.error('Update application status failed:', err);
+      alert(err instanceof Error ? err.message : 'Failed to update application status');
+    } finally {
+      setUpdatingCvId(null);
+    }
+  };
+
+  const getOfferStatusBadge = (active: boolean) =>
+    active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700';
+
+  const isAccepted = (s: string) => s === 'ACCEPTED' || s === 'ACCEPTE';
+  const isRejected = (s: string) => s === 'REJECTED' || s === 'REFUSE';
+
   const getApplicationStatusColor = (status: string) => {
-    if (status === 'ACCEPTE') return 'bg-green-100 text-green-700';
-    if (status === 'REFUSE') return 'bg-red-100 text-red-700';
+    if (isAccepted(status)) return 'bg-green-100 text-green-700';
+    if (isRejected(status)) return 'bg-red-100 text-red-700';
     return 'bg-blue-100 text-blue-700';
   };
 
   const getApplicationStatusLabel = (status: string) => {
-    if (status === 'ACCEPTE') return 'Accepted';
-    if (status === 'REFUSE') return 'Rejected';
-    return 'New';
+    if (isAccepted(status)) return 'Accepted';
+    if (isRejected(status)) return 'Rejected';
+    return 'Pending';
   };
 
   const totalJobs = offres.length;
@@ -161,13 +194,11 @@ export function RecruiterDashboard({ onNavigate }: RecruiterDashboardProps) {
 
       <main className="flex-1 bg-surface min-h-screen p-4 lg:p-8">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="mb-8">
             <h1 className="mb-2">Employer Dashboard</h1>
             <p className="text-secondary">Manage your job postings and track applications</p>
           </div>
 
-          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-white rounded-xl border border-color p-6">
               <div className="flex items-center justify-between mb-4">
@@ -214,7 +245,6 @@ export function RecruiterDashboard({ onNavigate }: RecruiterDashboardProps) {
             </div>
           </div>
 
-          {/* Posted Jobs Table */}
           <div className="bg-white rounded-xl border border-color p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <div>
@@ -230,87 +260,91 @@ export function RecruiterDashboard({ onNavigate }: RecruiterDashboardProps) {
               </Button>
             </div>
 
-            {offres.length === 0 ? (
-              <div className="text-center py-12">
-                <Briefcase className="h-12 w-12 text-muted mx-auto mb-4" />
-                <p className="text-secondary mb-4">You haven't posted any jobs yet</p>
-                <Button
-                  className="bg-primary hover:bg-primary-hover text-white rounded-lg"
-                  onClick={() => onNavigate('post-job')}
-                >
-                  Post Your First Job
-                </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Job Title</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-center">Applications</TableHead>
-                      <TableHead className="text-center">Views</TableHead>
-                      <TableHead>Posted Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Job Title</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-center">Applications</TableHead>
+                    <TableHead className="text-center">Views</TableHead>
+                    <TableHead>Posted Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {offres.map((job) => (
+                    <TableRow key={job.id}>
+                      <TableCell className="font-medium">{job.titre}</TableCell>
+
+                      <TableCell>
+                        <Badge className={`${getOfferStatusBadge(job.active)} border-0`}>
+                          {job.active ? 'Active' : 'Closed'}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell className="text-center">
+                        <span className="font-semibold text-primary">{job.applicationsCount}</span>
+                      </TableCell>
+
+                      <TableCell className="text-center">
+                        <span className="text-secondary">{job.applicationsCount * 5}</span>
+                      </TableCell>
+
+                      <TableCell className="text-secondary">
+                        {new Date(job.createdAt).toLocaleDateString()}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              {deletingId === job.id || togglingId === job.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <MoreVertical className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => onNavigate('offer-candidates', job.id.toString())}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Candidates
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem onClick={() => onNavigate('post-job', job.id.toString())}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Job
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              onClick={() => handleToggleOffre(job.id)}
+                              className={job.active ? "text-red-600" : "text-green-700"}
+                            >
+                              <Power className="h-4 w-4 mr-2" />
+                              {job.active ? "Deactivate Offer" : "Activate Offer"}
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={() => handleDeleteOffre(job.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Job
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {offres.map((job) => (
-                      <TableRow key={job.id}>
-                        <TableCell className="font-medium">{job.titre}</TableCell>
-                        <TableCell>
-                          <Badge className={`${getStatusColor(job.active ? 'Active' : 'Closed')} border-0`}>
-                            {job.active ? 'Active' : 'Closed'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="font-semibold text-primary">{job.applicationsCount}</span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="text-secondary">{job.applicationsCount * 5}</span>
-                        </TableCell>
-                        <TableCell className="text-secondary">
-                          {new Date(job.createdAt).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                {deletingId === job.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <MoreVertical className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => onNavigate('offer-candidates', job.id.toString())}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => onNavigate('post-job', job.id.toString())}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Job
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => handleDeleteOffre(job.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Job
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                  ))}
+                </TableBody>
+
+              </Table>
+            </div>
           </div>
 
-          {/* Recent Applications */}
           <div className="bg-white rounded-xl border border-color p-6 mt-8">
             <h2 className="mb-6">Recent Applications</h2>
 
@@ -321,43 +355,86 @@ export function RecruiterDashboard({ onNavigate }: RecruiterDashboardProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {recentApplications.map((application) => (
-                  <div
-                    key={application.id}
-                    className="flex items-center justify-between p-4 bg-surface rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-primary-light rounded-full flex items-center justify-center">
-                        <span className="font-semibold text-primary">
-                          {application.candidat.prenom?.[0]}
-                          {application.candidat.nom?.[0]}
+                {recentApplications.map((application) => {
+                  const accepted = isAccepted(application.statut);
+                  const rejected = isRejected(application.statut);
+
+                  return (
+                    <div
+                      key={application.id}
+                      className="flex flex-col lg:flex-row lg:items-center justify-between p-4 bg-surface rounded-lg gap-4"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-primary-light rounded-full flex items-center justify-center">
+                          <span className="font-semibold text-primary">
+                            {application.candidat.prenom?.[0]}
+                            {application.candidat.nom?.[0]}
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="mb-1">
+                            {application.candidat.prenom} {application.candidat.nom}
+                          </h4>
+                          <p className="text-sm text-secondary">{application.offre.titre}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 flex-wrap justify-end">
+                        <Badge className={`${getApplicationStatusColor(application.statut)} border-0`}>
+                          {getApplicationStatusLabel(application.statut)}
+                        </Badge>
+
+                        <span className="text-sm text-secondary flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          {new Date(application.uploadedAt).toLocaleDateString()}
                         </span>
-                      </div>
-                      <div>
-                        <h4 className="mb-1">
-                          {application.candidat.prenom} {application.candidat.nom}
-                        </h4>
-                        <p className="text-sm text-secondary">{application.offre.titre}</p>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-lg"
+                          onClick={() => onNavigate('offer-candidates', application.offre.id.toString())}
+                        >
+                          View
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-green-600 text-green-600 hover:bg-green-50 rounded-lg"
+                          disabled={updatingCvId === application.id || accepted}
+                          onClick={() => handleDecisionApplication(application.id, 'ACCEPTED')}
+                          title="Accept application"
+                          aria-label="Accept application"
+                        >
+                          {updatingCvId === application.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                          )}
+                          Accept
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-600 text-red-600 hover:bg-red-50 rounded-lg"
+                          disabled={updatingCvId === application.id || rejected}
+                          onClick={() => handleDecisionApplication(application.id, 'REJECTED')}
+                          title="Reject application"
+                          aria-label="Reject application"
+                        >
+                          {updatingCvId === application.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <XCircle className="h-4 w-4 mr-1" />
+                          )}
+                          Reject
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <Badge className={`${getApplicationStatusColor(application.statut)} border-0`}>
-                        {getApplicationStatusLabel(application.statut)}
-                      </Badge>
-                      <span className="text-sm text-secondary">
-                        {new Date(application.uploadedAt).toLocaleDateString()}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-lg"
-                        onClick={() => onNavigate('offer-candidates', application.offre.id.toString())}
-                      >
-                        View
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

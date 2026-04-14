@@ -17,9 +17,7 @@ export async function login(email: string, password: string): Promise<LoginResul
   try {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
 
@@ -53,13 +51,7 @@ export async function registerCandidate(
 
   const allowedRole = role === "RECRUTEUR" ? "RECRUTEUR" : "CANDIDAT";
 
-  const body = {
-    nom,
-    prenom,
-    email,
-    password,
-    role: allowedRole,
-  };
+  const body = { nom, prenom, email, password, role: allowedRole };
 
   try {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
@@ -97,16 +89,6 @@ export interface AdminStats {
   totalRecruiters: number;
   totalAdmins: number;
   totalOffres: number;
-}
-
-function getAuthHeaders() {
-  const token = localStorage.getItem("authToken");
-  if (!token) throw new Error("You must be logged in");
-
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
 }
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
@@ -249,7 +231,7 @@ export interface CVDTO {
   nomFichier: string;
   cheminFichier: string;
   texteExtrait: string | null;
-  statut: string;
+  statut: string; // PENDING | ACCEPTED | REJECTED (or old values in DB)
   candidat: {
     id: number;
     nom: string;
@@ -259,6 +241,7 @@ export interface CVDTO {
   offre: {
     id: number;
     titre: string;
+    // backend may also include status/active; we resolve those from getAllOffres when needed
   };
   uploadedAt: string;
 }
@@ -329,6 +312,36 @@ export async function getMesCVs(): Promise<CVDTO[]> {
   }
 }
 
+export async function downloadCVFile(cvId: number, fileName: string): Promise<void> {
+  const token = localStorage.getItem("authToken");
+  if (!token) throw new Error("You must be logged in");
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/cv/${cvId}/file`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) throw new Error("Failed to download file");
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  } catch (err) {
+    console.error("downloadCVFile failed", err);
+    throw err;
+  }
+}
+
+export function getCVFileUrl(cvId: number): string {
+  return `http://localhost:8080/api/cv/${cvId}/file`;
+}
+
 // ========================================
 // MATCHING SCORE TYPES & FUNCTIONS
 // ========================================
@@ -375,7 +388,10 @@ export async function calculateMatchingScore(cvId: number): Promise<MatchingScor
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!response.ok) throw new Error("Failed to calculate score");
+    if (!response.ok) {
+      const msg = await response.text();
+      throw new Error(msg || "Failed to calculate score");
+    }
 
     return await response.json();
   } catch (err) {
@@ -384,15 +400,21 @@ export async function calculateMatchingScore(cvId: number): Promise<MatchingScor
   }
 }
 
-export async function updateCandidatureStatus(
+// ========================================
+// ACCEPT / REFUSE APPLICATIONS (CV STATUS)
+// ========================================
+
+export type StatutCandidature = "PENDING" | "ACCEPTED" | "REJECTED";
+
+export async function updateCandidatureStatusNew(
   cvId: number,
-  statut: "ACCEPTE" | "REFUSE"
+  statut: StatutCandidature
 ): Promise<void> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
 
   try {
-    const response = await fetch(`${API_BASE_URL}/cv/${cvId}/statut`, {
+    const response = await fetch(`${API_BASE_URL}/cv/${cvId}/status`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -401,41 +423,30 @@ export async function updateCandidatureStatus(
       body: JSON.stringify({ statut }),
     });
 
-    if (!response.ok) throw new Error("Failed to update status");
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || "Failed to update status");
+    }
   } catch (err) {
-    console.error("updateCandidatureStatus failed", err);
+    console.error("updateCandidatureStatusNew failed", err);
     throw err;
   }
 }
 
-export async function downloadCVFile(cvId: number, fileName: string): Promise<void> {
-  const token = localStorage.getItem("authToken");
-  if (!token) throw new Error("You must be logged in");
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/cv/${cvId}/file`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!response.ok) throw new Error("Failed to download file");
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  } catch (err) {
-    console.error("downloadCVFile failed", err);
-    throw err;
-  }
+export async function updateCandidatureStatus(
+  cvId: number,
+  statut: "ACCEPTE" | "REFUSE"
+): Promise<void> {
+  const mapped: StatutCandidature = statut === "ACCEPTE" ? "ACCEPTED" : "REJECTED";
+  return updateCandidatureStatusNew(cvId, mapped);
 }
 
-export function getCVFileUrl(cvId: number): string {
-  return `http://localhost:8080/api/cv/${cvId}/file`;
+export async function acceptApplication(cvId: number): Promise<void> {
+  return updateCandidatureStatusNew(cvId, "ACCEPTED");
+}
+
+export async function rejectApplication(cvId: number): Promise<void> {
+  return updateCandidatureStatusNew(cvId, "REJECTED");
 }
 
 // ========================================
@@ -456,6 +467,8 @@ export interface OffreDTO {
   salaryMax: number;
   active: boolean;
   createdAt: string;
+  status?: "ACTIVE" | "UPDATED" | "CLOSED" | "DELETED" | string;
+  updatedAt?: string;
 }
 
 export async function getMesOffres(): Promise<OffreDTO[]> {
@@ -486,10 +499,22 @@ export async function getAllOffres(): Promise<OffreDTO[]> {
     });
 
     if (!response.ok) throw new Error("Failed to fetch offres");
-
     return await response.json();
   } catch (err) {
     console.error("getAllOffres failed", err);
+    throw err;
+  }
+}
+
+export async function getActiveOffres(): Promise<OffreDTO[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/offres/active`, {
+      method: "GET",
+    });
+    if (!response.ok) throw new Error("Failed to fetch active offres");
+    return await response.json();
+  } catch (err) {
+    console.error("getActiveOffres failed", err);
     throw err;
   }
 }
@@ -504,7 +529,10 @@ export async function deleteOffre(offreId: number): Promise<void> {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!response.ok) throw new Error("Failed to delete offre");
+    if (!response.ok) {
+      const msg = await response.text();
+      throw new Error(msg || "Failed to delete offre");
+    }
   } catch (err) {
     console.error("deleteOffre failed", err);
     throw err;
@@ -535,6 +563,58 @@ export async function createOffre(
     return await response.json();
   } catch (err) {
     console.error("createOffre failed", err);
+    throw err;
+  }
+}
+
+/**
+ * Activate/Deactivate offers
+ * PATCH /api/offres/{id}/toggle-status
+ */
+export async function toggleOffreStatus(offreId: number): Promise<OffreDTO> {
+  const token = localStorage.getItem("authToken");
+  if (!token) throw new Error("You must be logged in");
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/offres/${offreId}/toggle-status`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const msg = await response.text();
+      throw new Error(msg || "Failed to toggle offer status");
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error("toggleOffreStatus failed", err);
+    throw err;
+  }
+}
+
+export async function setOffreActive(offreId: number, active: boolean): Promise<OffreDTO> {
+  const token = localStorage.getItem("authToken");
+  if (!token) throw new Error("You must be logged in");
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/offres/${offreId}/set-active`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ active }),
+    });
+
+    if (!response.ok) {
+      const msg = await response.text();
+      throw new Error(msg || "Failed to set offer active flag");
+    }
+
+    return await response.json();
+  } catch (err) {
+    console.error("setOffreActive failed", err);
     throw err;
   }
 }

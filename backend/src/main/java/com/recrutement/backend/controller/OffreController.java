@@ -137,8 +137,9 @@ public class OffreController {
     public ResponseEntity<?> deleteOffre(@PathVariable Long id) {
         log.info("🗑️ DELETE /api/offres/{}", id);
         try {
+            // Soft delete to keep offer visible with status DELETED
             offreService.deleteOffre(id);
-            return ResponseEntity.ok(createSuccessResponse("Offre supprimée avec succès"));
+            return ResponseEntity.ok(createSuccessResponse("Offre supprimée (soft delete)"));
         } catch (RuntimeException e) {
             log.error("❌ Erreur: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -196,6 +197,34 @@ public class OffreController {
             log.error("❌ Erreur: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(createErrorResponse("Erreur serveur"));
+        }
+    }
+
+    @PatchMapping("/{id}/set-active")
+    @PreAuthorize("hasRole('RECRUTEUR') or hasRole('ADMIN')")
+    public ResponseEntity<?> setOffreActive(
+            @PathVariable Long id,
+            @RequestBody Map<String, Boolean> body,
+            Authentication authentication
+    ) {
+        log.info("✅ PATCH /api/offres/{}/set-active", id);
+
+        try {
+            Boolean active = body.get("active");
+            if (active == null) {
+                return ResponseEntity.badRequest().body(createErrorResponse("Missing field: active"));
+            }
+
+            String email = authentication.getName();
+            Offre updated = offreService.setOffreActive(id, active, email);
+
+            return ResponseEntity.ok(updated);
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(createErrorResponse(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Server error: " + e.getMessage()));
         }
     }
 
