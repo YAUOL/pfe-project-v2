@@ -78,7 +78,6 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const handleDeleteUser = async (id: number) => {
     const confirmed = window.confirm('Are you sure you want to delete this user?');
     if (!confirmed) return;
-
     try {
       await deleteAdminUser(id);
       await loadAdminData();
@@ -90,7 +89,6 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const handleDeleteOffre = async (id: number) => {
     const confirmed = window.confirm('Are you sure you want to delete this offer?');
     if (!confirmed) return;
-
     try {
       await deleteAdminOffre(id);
       await loadAdminData();
@@ -101,27 +99,25 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'ADMIN':
-        return 'bg-purple-100 text-purple-700';
-      case 'RECRUTEUR':
-        return 'bg-blue-100 text-blue-700';
-      case 'CANDIDAT':
-        return 'bg-green-100 text-green-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
+      case 'ADMIN': return 'bg-purple-100 text-purple-700';
+      case 'RECRUTEUR': return 'bg-blue-100 text-blue-700';
+      case 'CANDIDAT': return 'bg-green-100 text-green-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
   if (loading) {
     return (
-      <div className="flex">
+      <div className="flex h-screen overflow-hidden">
         <DashboardSidebar
           userType="admin"
           activePage="admin-dashboard"
           onNavigate={onNavigate}
-          onLogout={() => onNavigate('home')}
         />
-        <main className="flex-1 bg-surface min-h-screen p-4 lg:p-8 flex items-center justify-center">
+        <main
+          id="admin-main"
+          className="flex-1 bg-surface h-screen overflow-y-auto p-4 lg:p-8 flex items-center justify-center"
+        >
           <p className="text-secondary">Loading admin dashboard...</p>
         </main>
       </div>
@@ -130,14 +126,16 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
   if (error) {
     return (
-      <div className="flex">
+      <div className="flex h-screen overflow-hidden">
         <DashboardSidebar
           userType="admin"
           activePage="admin-dashboard"
           onNavigate={onNavigate}
-          onLogout={() => onNavigate('home')}
         />
-        <main className="flex-1 bg-surface min-h-screen p-4 lg:p-8 flex items-center justify-center">
+        <main
+          id="admin-main"
+          className="flex-1 bg-surface h-screen overflow-y-auto p-4 lg:p-8 flex items-center justify-center"
+        >
           <div className="bg-white rounded-xl border border-color p-8 text-center max-w-md w-full">
             <h2 className="mb-3">Admin Dashboard Error</h2>
             <p className="text-red-600 mb-4">{error}</p>
@@ -154,86 +152,93 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   }
 
   return (
-    <div className="flex">
+    <div className="flex h-screen overflow-hidden">
       <DashboardSidebar
         userType="admin"
         activePage="admin-dashboard"
         onNavigate={onNavigate}
-        onLogout={() => onNavigate('home')}
       />
 
-      <main className="flex-1 bg-surface min-h-screen p-4 lg:p-8">
+      <main
+        id="admin-main"
+        className="flex-1 bg-surface h-screen overflow-y-auto p-4 lg:p-8"
+      >
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="mb-2">Admin Dashboard</h1>
-            <p className="text-secondary">
-              Manage users, supervise job offers, and monitor platform activity
-            </p>
-          </div>
 
-          {/* Stats Cards */}
-          {stats && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
-              <div className="bg-white rounded-xl border border-color p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Users className="h-6 w-6 text-primary" />
-                  </div>
-                  <TrendingUp className="h-5 w-5 text-green-500" />
-                </div>
-                <h3 className="text-3xl font-bold mb-1">{stats.totalUsers}</h3>
-                <p className="text-secondary text-sm">Total Users</p>
-              </div>
-
-              <div className="bg-white rounded-xl border border-color p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <Users className="h-6 w-6 text-green-600" />
-                  </div>
-                  <TrendingUp className="h-5 w-5 text-green-500" />
-                </div>
-                <h3 className="text-3xl font-bold mb-1">{stats.totalCandidates}</h3>
-                <p className="text-secondary text-sm">Candidates</p>
-              </div>
-
-              <div className="bg-white rounded-xl border border-color p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Briefcase className="h-6 w-6 text-orange-600" />
-                  </div>
-                  <TrendingUp className="h-5 w-5 text-green-500" />
-                </div>
-                <h3 className="text-3xl font-bold mb-1">{stats.totalRecruiters}</h3>
-                <p className="text-secondary text-sm">Recruiters</p>
-              </div>
-
-              <div className="bg-white rounded-xl border border-color p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <ShieldCheck className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <span className="text-sm font-medium text-purple-600">Secure</span>
-                </div>
-                <h3 className="text-3xl font-bold mb-1">{stats.totalAdmins}</h3>
-                <p className="text-secondary text-sm">Admins</p>
-              </div>
-
-              <div className="bg-white rounded-xl border border-color p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                    <Briefcase className="h-6 w-6 text-indigo-600" />
-                  </div>
-                  <span className="text-sm font-medium text-indigo-600">Published</span>
-                </div>
-                <h3 className="text-3xl font-bold mb-1">{stats.totalOffres}</h3>
-                <p className="text-secondary text-sm">Total Offers</p>
-              </div>
+          {/* Overview */}
+          <section id="admin-dashboard-overview" className="mb-8 scroll-mt-6">
+            <div className="mb-8">
+              <h1 className="mb-2">Admin Dashboard</h1>
+              <p className="text-secondary">
+                Manage users, supervise job offers, and monitor platform activity
+              </p>
             </div>
-          )}
 
-          {/* Users Table */}
-          <div className="bg-white rounded-xl border border-color p-6 mb-8">
+            {stats && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
+                <div className="bg-white rounded-xl border border-color p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Users className="h-6 w-6 text-primary" />
+                    </div>
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                  </div>
+                  <h3 className="text-3xl font-bold mb-1">{stats.totalUsers}</h3>
+                  <p className="text-secondary text-sm">Total Users</p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-color p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Users className="h-6 w-6 text-green-600" />
+                    </div>
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                  </div>
+                  <h3 className="text-3xl font-bold mb-1">{stats.totalCandidates}</h3>
+                  <p className="text-secondary text-sm">Candidates</p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-color p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <Briefcase className="h-6 w-6 text-orange-600" />
+                    </div>
+                    <TrendingUp className="h-5 w-5 text-green-500" />
+                  </div>
+                  <h3 className="text-3xl font-bold mb-1">{stats.totalRecruiters}</h3>
+                  <p className="text-secondary text-sm">Recruiters</p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-color p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <ShieldCheck className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <span className="text-sm font-medium text-purple-600">Secure</span>
+                  </div>
+                  <h3 className="text-3xl font-bold mb-1">{stats.totalAdmins}</h3>
+                  <p className="text-secondary text-sm">Admins</p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-color p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                      <Briefcase className="h-6 w-6 text-indigo-600" />
+                    </div>
+                    <span className="text-sm font-medium text-indigo-600">Published</span>
+                  </div>
+                  <h3 className="text-3xl font-bold mb-1">{stats.totalOffres}</h3>
+                  <p className="text-secondary text-sm">Total Offers</p>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Users Management */}
+          <section
+            id="users-management"
+            className="bg-white rounded-xl border border-color p-6 mb-8 scroll-mt-6"
+          >
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <div>
                 <h2 className="mb-1">Users Management</h2>
@@ -312,10 +317,13 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 <p className="text-center text-secondary py-6">No users found.</p>
               )}
             </div>
-          </div>
+          </section>
 
-          {/* Offers Table */}
-          <div className="bg-white rounded-xl border border-color p-6">
+          {/* Offers Management */}
+          <section
+            id="offers-management"
+            className="bg-white rounded-xl border border-color p-6 scroll-mt-6"
+          >
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <div>
                 <h2 className="mb-1">Offers Management</h2>
@@ -394,7 +402,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 <p className="text-center text-secondary py-6">No offers found.</p>
               )}
             </div>
-          </div>
+          </section>
         </div>
       </main>
     </div>

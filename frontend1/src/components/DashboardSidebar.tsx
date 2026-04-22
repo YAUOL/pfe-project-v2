@@ -3,73 +3,81 @@ import {
   Briefcase,
   FileText,
   User,
-  LogOut,
   PlusCircle,
   Bookmark,
   Menu,
   X,
   Users,
-  ShieldCheck,
 } from 'lucide-react';
-import { Button } from './ui/button';
 import { useState } from 'react';
 
 interface DashboardSidebarProps {
-  userType: 'Recruteur' | 'candidate' | 'admin';
+  userType: 'Recruteur' | 'candidate' | 'admin' | 'RECRUTEUR' | 'CANDIDAT' | 'ADMIN';
   activePage: string;
-  onNavigate: (page: string) => void;
-  onLogout: () => void;
+  onNavigate: (page: string, jobId?: string) => void;
+  onLogout?: () => void;
 }
 
 export function DashboardSidebar({
   userType,
   activePage,
   onNavigate,
-  onLogout,
 }: DashboardSidebarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const isAdmin = userType === 'admin' || userType === 'ADMIN';
+  const isRecruiter = userType === 'Recruteur' || userType === 'RECRUTEUR';
+
   const employerMenuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: 'employer-dashboard' },
-    { icon: PlusCircle, label: 'Post Job', path: 'post-job' },
-    { icon: Briefcase, label: 'Manage Jobs', path: 'manage-jobs' },
-    { icon: User, label: 'Profile', path: 'profile' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: 'employer-dashboard', sectionId: '' },
+    { icon: PlusCircle, label: 'Post Job', path: 'post-job', sectionId: '' },
+    { icon: Briefcase, label: 'Manage Jobs', path: 'manage-jobs', sectionId: '' },
+    { icon: User, label: 'Profile', path: 'profile', sectionId: '' },
   ];
 
   const candidateMenuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: 'candidate-dashboard' },
-    { icon: User, label: 'Profile', path: 'profile' },
-    { icon: FileText, label: 'My Applications', path: 'my-applications' },
-    { icon: Bookmark, label: 'Saved Jobs', path: 'saved-jobs' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: 'candidate-dashboard', sectionId: '' },
+    { icon: User, label: 'Profile', path: 'profile', sectionId: '' },
+    { icon: FileText, label: 'My Applications', path: 'my-applications', sectionId: '' },
+    { icon: Bookmark, label: 'Saved Jobs', path: 'saved-jobs', sectionId: '' },
   ];
 
   const adminMenuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: 'admin-dashboard' },
-    { icon: Users, label: 'Users Management', path: 'admin-dashboard' },
-    { icon: Briefcase, label: 'Offers Management', path: 'admin-dashboard' },
-    { icon: ShieldCheck, label: 'Platform Control', path: 'admin-dashboard' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: 'admin-dashboard', sectionId: 'admin-dashboard-overview' },
+    { icon: Users, label: 'Users Management', path: 'admin-dashboard', sectionId: 'users-management' },
+    { icon: Briefcase, label: 'Offers Management', path: 'admin-dashboard', sectionId: 'offers-management' },
   ];
 
-  const menuItems =
-    userType === 'Recruteur'
-      ? employerMenuItems
-      : userType === 'admin'
-      ? adminMenuItems
-      : candidateMenuItems;
+  const menuItems = isRecruiter
+    ? employerMenuItems
+    : isAdmin
+    ? adminMenuItems
+    : candidateMenuItems;
 
-  const portalLabel =
-    userType === 'Recruteur'
-      ? 'Recruiter Portal'
-      : userType === 'admin'
-      ? 'Admin Portal'
-      : 'Candidate Portal';
+  const portalLabel = isAdmin
+    ? 'Admin Portal'
+    : isRecruiter
+    ? 'Recruiter Portal'
+    : 'Candidate Portal';
 
-  const portalInitials =
-    userType === 'admin'
-      ? 'AD'
-      : userType === 'Recruteur'
-      ? 'JB'
-      : 'JB';
+  const portalInitials = isAdmin ? 'AD' : 'JB';
+
+  const handleItemClick = (path: string, sectionId: string) => {
+    setMobileMenuOpen(false);
+    onNavigate(path);
+
+    // after navigation, scroll to the section
+    setTimeout(() => {
+      if (sectionId) {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 100);
+  };
 
   const SidebarContent = () => (
     <>
@@ -94,11 +102,9 @@ export function DashboardSidebar({
             return (
               <li key={`${item.path}-${index}`}>
                 <button
-                  onClick={() => {
-                    onNavigate(item.path);
-                    setMobileMenuOpen(false);
-                  }}
-                  className={`w-full flex items-center px-4 py-3 rounded-lg transition-all ${
+                  type="button"
+                  onClick={() => handleItemClick(item.path, item.sectionId)}
+                  className={`w-full flex items-center px-4 py-3 rounded-lg transition-all text-left ${
                     isActive
                       ? 'bg-primary-light text-primary font-medium'
                       : 'text-secondary hover:bg-surface hover:text-primary'
@@ -112,22 +118,12 @@ export function DashboardSidebar({
           })}
         </ul>
       </nav>
-
-      <div className="p-4 border-t border-color">
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-secondary hover:text-primary hover:bg-surface"
-          onClick={onLogout}
-        >
-          <LogOut className="h-5 w-5 mr-3" />
-          Logout
-        </Button>
-      </div>
     </>
   );
 
   return (
     <>
+      {/* Mobile toggle button */}
       <button
         className="lg:hidden fixed top-20 left-4 z-50 bg-white border border-color rounded-lg p-2 shadow-custom-md"
         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -139,10 +135,12 @@ export function DashboardSidebar({
         )}
       </button>
 
+      {/* Desktop sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-64 bg-white border-r border-color h-screen sticky top-0">
         <SidebarContent />
       </aside>
 
+      {/* Mobile sidebar */}
       {mobileMenuOpen && (
         <>
           <div

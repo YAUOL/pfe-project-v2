@@ -1,0 +1,22 @@
+[
+  {
+    "id": "platform_001",
+    "text": "JobBoard is an AI-powered recruitment platform. Candidates can create an account, upload their CV, and apply to job offers. The AI system automatically analyzes the CV and calculates a matching score against the job requirements."
+  },
+  {
+    "id": "platform_002",
+    "text": "How to apply for a job on JobBoard: 1. Create a candidate account. 2. Go to Job Listings. 3. Click on a job offer. 4. Upload your CV in PDF format. 5. The AI will analyze your CV and calculate your matching score. 6. The recruiter will review your application."
+  },
+  {
+    "id": "platform_003",
+    "text": "CV Tips for candidates: Always include your technical skills clearly. List your tools and technologies such as React, Java, Python, Docker. Describe your professional experiences with concrete responsibilities. Include certifications and formations. Keep your CV clean and use PDF format."
+  },
+  {
+    "id": "platform_004",
+    "text": "How recruiters use JobBoard: Recruiters can post job offers with required skills and view all candidates ranked by AI matching score. Each candidate profile shows matched skills, missing skills, and CV text. Recruiters can accept or reject applications from the dashboard."
+  },
+  {
+    "id": "platform_005",
+    "text": "The AI matching score is calculated based on two factors: Skills score (60%) measures how many required skills are found in the CV. Semantic similarity (40%) measures how closely the candidate profile matches the job description. A score above 70% is considered a strong match."
+  }
+]

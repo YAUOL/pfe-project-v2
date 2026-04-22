@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { ChatBot } from './components/ChatBot';
 import { Home } from './pages/Home';
 import { JobListings } from './pages/JobListings';
 import { JobDetail } from './pages/JobDetail';
@@ -50,16 +51,12 @@ export default function App() {
   }, []);
 
   const handleNavigate = (page: string, jobId?: string) => {
-    // Optional route protection
     if (page === 'admin-dashboard' && userRole !== 'ADMIN') {
       setCurrentPage('home');
       return;
     }
-
     setCurrentPage(page as Page);
-    if (jobId) {
-      setSelectedJobId(jobId);
-    }
+    if (jobId) setSelectedJobId(jobId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -76,16 +73,10 @@ export default function App() {
     const role = localStorage.getItem('authRole');
     setIsLoggedIn(true);
     setUserRole(role);
-
-    if (role === 'ADMIN') {
-      setCurrentPage('admin-dashboard');
-    } else if (role === 'RECRUTEUR') {
-      setCurrentPage('employer-dashboard');
-    } else if (role === 'CANDIDAT') {
-      setCurrentPage('candidate-dashboard');
-    } else {
-      setCurrentPage('home');
-    }
+    if (role === 'ADMIN') setCurrentPage('admin-dashboard');
+    else if (role === 'RECRUTEUR') setCurrentPage('employer-dashboard');
+    else if (role === 'CANDIDAT') setCurrentPage('candidate-dashboard');
+    else setCurrentPage('home');
   };
 
   const showNavbarAndFooter = !['login', 'signup', 'forgot-password'].includes(currentPage);
@@ -94,46 +85,33 @@ export default function App() {
     switch (currentPage) {
       case 'home':
         return <Home onNavigate={handleNavigate} />;
-
       case 'job-listings':
         return <JobListings onNavigate={handleNavigate} />;
-
       case 'job-detail':
         return <JobDetail jobId={selectedJobId} onNavigate={handleNavigate} />;
-
       case 'employer-dashboard':
         return <RecruiterDashboard onNavigate={handleNavigate} />;
-
       case 'candidate-dashboard':
         return <CandidateDashboard onNavigate={handleNavigate} />;
-
       case 'admin-dashboard':
         return userRole === 'ADMIN'
           ? <AdminDashboard onNavigate={handleNavigate} />
           : <Home onNavigate={handleNavigate} />;
-
       case 'job-application':
         return <JobApplication jobId={selectedJobId} onNavigate={handleNavigate} />;
-
       case 'login':
         return <Login onNavigate={handleNavigate} onLoginSuccess={handleLoginSuccess} />;
-
       case 'signup':
         return <Signup onNavigate={handleNavigate} />;
-
       case 'forgot-password':
         return <ForgotPassword onNavigate={handleNavigate} />;
-
       case 'post-job':
         return <PostJob onNavigate={handleNavigate} />;
-
       case 'offer-candidates':
         return <OfferCandidates offerId={selectedJobId} onNavigate={handleNavigate} />;
-
       case 'profile':
       case 'recruiter-profile':
         return <ProfileEdit onNavigate={handleNavigate} />;
-
       case 'manage-jobs':
       case 'my-applications':
       case 'saved-jobs':
@@ -151,7 +129,6 @@ export default function App() {
             </div>
           </div>
         );
-
       default:
         return <Home onNavigate={handleNavigate} />;
     }
@@ -171,7 +148,14 @@ export default function App() {
       <main className="flex-1">
         {renderPage()}
       </main>
-      {showNavbarAndFooter && <Footer />}
+      {showNavbarAndFooter && (
+        <Footer
+          onNavigate={handleNavigate}
+          isLoggedIn={isLoggedIn}
+          userRole={userRole}
+        />
+      )}
+      <ChatBot />
     </div>
   );
 }
