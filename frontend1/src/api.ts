@@ -11,6 +11,8 @@ export interface LoginResult {
   token: string;
   email: string;
   role: string;
+  id: number;
+  fullName: string;
 }
 
 export async function login(email: string, password: string): Promise<LoginResult> {
@@ -20,18 +22,16 @@ export async function login(email: string, password: string): Promise<LoginResul
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-
     if (!response.ok) {
       const message = await response.text();
       throw new Error(message || "Login failed");
     }
-
     const data = (await response.json()) as LoginResult;
-
     localStorage.setItem("authToken", data.token);
     localStorage.setItem("authEmail", data.email);
     localStorage.setItem("authRole", data.role);
-
+    localStorage.setItem("authId", data.id.toString());
+    localStorage.setItem("authFullName", data.fullName);
     return data;
   } catch (err) {
     console.error("login request failed", err);
@@ -48,18 +48,14 @@ export async function registerCandidate(
   const parts = fullName.trim().split(" ").filter(Boolean);
   const prenom = parts[0] || "";
   const nom = parts.slice(1).join(" ") || prenom;
-
   const allowedRole = role === "RECRUTEUR" ? "RECRUTEUR" : "CANDIDAT";
-
   const body = { nom, prenom, email, password, role: allowedRole };
-
   try {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-
     if (!response.ok) {
       const message = await response.text();
       throw new Error(message || "Register failed");
@@ -94,27 +90,20 @@ export interface AdminStats {
 export async function getAdminUsers(): Promise<AdminUser[]> {
   const response = await fetch(`${API_BASE_URL}/admin/users`, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-    },
+    headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
   });
-
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || "Failed to fetch users");
   }
-
   return await response.json();
 }
 
 export async function deleteAdminUser(userId: number): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-    },
+    headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
   });
-
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || "Failed to delete user");
@@ -124,46 +113,47 @@ export async function deleteAdminUser(userId: number): Promise<void> {
 export async function getAdminOffres(): Promise<OffreDTO[]> {
   const response = await fetch(`${API_BASE_URL}/admin/offres`, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-    },
+    headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
   });
-
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || "Failed to fetch offers");
   }
-
   return await response.json();
 }
 
-export async function deleteAdminOffre(offreId: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/admin/offres/${offreId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-    },
+export async function adminDeactivateOffre(offreId: number): Promise<void> {
+  const token = localStorage.getItem("authToken");
+  if (!token) throw new Error("You must be logged in");
+  const response = await fetch(`${API_BASE_URL}/offres/${offreId}/admin-deactivate`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
   });
-
   if (!response.ok) {
     const message = await response.text();
-    throw new Error(message || "Failed to delete offer");
+    throw new Error(message || "Failed to deactivate offer");
   }
 }
 
 export async function getAdminStats(): Promise<AdminStats> {
   const response = await fetch(`${API_BASE_URL}/admin/stats`, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-    },
+    headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
   });
-
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || "Failed to fetch admin stats");
   }
+  return await response.json();
+}
 
+export async function getAdminId(): Promise<{ id: number; nom: string; prenom: string }> {
+  const token = localStorage.getItem("authToken");
+  if (!token) throw new Error("You must be logged in");
+  const response = await fetch(`${API_BASE_URL}/admin/admin-id`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Failed to fetch admin id");
   return await response.json();
 }
 
@@ -183,15 +173,12 @@ export interface UserProfile {
 export async function getMyProfile(): Promise<UserProfile> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/utilisateurs/me`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!response.ok) throw new Error("Failed to fetch profile");
-
     return await response.json();
   } catch (err) {
     console.error("getMyProfile failed", err);
@@ -202,7 +189,6 @@ export async function getMyProfile(): Promise<UserProfile> {
 export async function updateMyProfile(prenom: string, nom: string): Promise<UserProfile> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/utilisateurs/me`, {
       method: "PUT",
@@ -212,9 +198,7 @@ export async function updateMyProfile(prenom: string, nom: string): Promise<User
       },
       body: JSON.stringify({ prenom, nom }),
     });
-
     if (!response.ok) throw new Error("Failed to update profile");
-
     return await response.json();
   } catch (err) {
     console.error("updateMyProfile failed", err);
@@ -231,7 +215,7 @@ export interface CVDTO {
   nomFichier: string;
   cheminFichier: string;
   texteExtrait: string | null;
-  statut: string; // PENDING | ACCEPTED | REJECTED (or old values in DB)
+  statut: string;
   candidat: {
     id: number;
     nom: string;
@@ -241,7 +225,6 @@ export interface CVDTO {
   offre: {
     id: number;
     titre: string;
-    // backend may also include status/active; we resolve those from getAllOffres when needed
   };
   uploadedAt: string;
 }
@@ -249,24 +232,19 @@ export interface CVDTO {
 export async function uploadCv(file: File, offreId: number): Promise<string> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in to upload a CV.");
-
   const formData = new FormData();
   formData.append("file", file);
   formData.append("offreId", offreId.toString());
-
   try {
     const response = await fetch(`${API_BASE_URL}/cv/upload`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
-
     if (!response.ok) {
       const message = await response.text();
-      console.error("cv upload response", response.status, message);
       throw new Error(message || "CV upload failed");
     }
-
     return await response.text();
   } catch (err) {
     console.error("cv upload failed", err);
@@ -277,15 +255,12 @@ export async function uploadCv(file: File, offreId: number): Promise<string> {
 export async function getCVsByOffre(offreId: number): Promise<CVDTO[]> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/cv/offre/${offreId}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!response.ok) throw new Error("Failed to fetch CVs");
-
     return await response.json();
   } catch (err) {
     console.error("getCVsByOffre failed", err);
@@ -296,15 +271,12 @@ export async function getCVsByOffre(offreId: number): Promise<CVDTO[]> {
 export async function getMesCVs(): Promise<CVDTO[]> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/cv/mes-cvs`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!response.ok) throw new Error("Failed to fetch my CVs");
-
     return await response.json();
   } catch (err) {
     console.error("getMesCVs failed", err);
@@ -315,14 +287,11 @@ export async function getMesCVs(): Promise<CVDTO[]> {
 export async function downloadCVFile(cvId: number, fileName: string): Promise<void> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/cv/${cvId}/file`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!response.ok) throw new Error("Failed to download file");
-
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -362,15 +331,12 @@ export interface CandidateWithScore {
 export async function getCVsWithScores(offreId: number): Promise<CandidateWithScore[]> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/cv/offre/${offreId}/with-scores`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!response.ok) throw new Error("Failed to fetch CVs with scores");
-
     return await response.json();
   } catch (err) {
     console.error("getCVsWithScores failed", err);
@@ -381,18 +347,15 @@ export async function getCVsWithScores(offreId: number): Promise<CandidateWithSc
 export async function calculateMatchingScore(cvId: number): Promise<MatchingScoreDTO> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
-    const response = await fetch(`${API_BASE_URL}/cv/calculate-match/${cvId}`, {
+    const response = await fetch(`${API_BASE_URL}/matching/recalculate/${cvId}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!response.ok) {
       const msg = await response.text();
       throw new Error(msg || "Failed to calculate score");
     }
-
     return await response.json();
   } catch (err) {
     console.error("calculateMatchingScore failed", err);
@@ -401,7 +364,7 @@ export async function calculateMatchingScore(cvId: number): Promise<MatchingScor
 }
 
 // ========================================
-// ACCEPT / REFUSE APPLICATIONS (CV STATUS)
+// ACCEPT / REFUSE APPLICATIONS
 // ========================================
 
 export type StatutCandidature = "PENDING" | "ACCEPTED" | "REJECTED";
@@ -412,7 +375,6 @@ export async function updateCandidatureStatusNew(
 ): Promise<void> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/cv/${cvId}/status`, {
       method: "PUT",
@@ -422,7 +384,6 @@ export async function updateCandidatureStatusNew(
       },
       body: JSON.stringify({ statut }),
     });
-
     if (!response.ok) {
       const message = await response.text();
       throw new Error(message || "Failed to update status");
@@ -466,6 +427,7 @@ export interface OffreDTO {
   salaryMin: number;
   salaryMax: number;
   active: boolean;
+  disabledByAdmin: boolean;
   createdAt: string;
   status?: "ACTIVE" | "UPDATED" | "CLOSED" | "DELETED" | string;
   updatedAt?: string;
@@ -474,17 +436,13 @@ export interface OffreDTO {
 export async function getMesOffres(): Promise<OffreDTO[]> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const profile = await getMyProfile();
-
     const response = await fetch(`${API_BASE_URL}/offres/recruteur/${profile.id}`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!response.ok) throw new Error("Failed to fetch offres");
-
     return await response.json();
   } catch (err) {
     console.error("getMesOffres failed", err);
@@ -494,10 +452,7 @@ export async function getMesOffres(): Promise<OffreDTO[]> {
 
 export async function getAllOffres(): Promise<OffreDTO[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/offres`, {
-      method: "GET",
-    });
-
+    const response = await fetch(`${API_BASE_URL}/offres`, { method: "GET" });
     if (!response.ok) throw new Error("Failed to fetch offres");
     return await response.json();
   } catch (err) {
@@ -508,9 +463,7 @@ export async function getAllOffres(): Promise<OffreDTO[]> {
 
 export async function getActiveOffres(): Promise<OffreDTO[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/offres/active`, {
-      method: "GET",
-    });
+    const response = await fetch(`${API_BASE_URL}/offres/active`, { method: "GET" });
     if (!response.ok) throw new Error("Failed to fetch active offres");
     return await response.json();
   } catch (err) {
@@ -522,13 +475,11 @@ export async function getActiveOffres(): Promise<OffreDTO[]> {
 export async function deleteOffre(offreId: number): Promise<void> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/offres/${offreId}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!response.ok) {
       const msg = await response.text();
       throw new Error(msg || "Failed to delete offre");
@@ -540,11 +491,10 @@ export async function deleteOffre(offreId: number): Promise<void> {
 }
 
 export async function createOffre(
-  offre: Omit<OffreDTO, "id" | "active" | "createdAt">
+  offre: Omit<OffreDTO, "id" | "active" | "createdAt" | "disabledByAdmin">
 ): Promise<OffreDTO> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/offres`, {
       method: "POST",
@@ -554,12 +504,10 @@ export async function createOffre(
       },
       body: JSON.stringify(offre),
     });
-
     if (!response.ok) {
       const message = await response.text();
       throw new Error(message || "Failed to create offre");
     }
-
     return await response.json();
   } catch (err) {
     console.error("createOffre failed", err);
@@ -567,25 +515,44 @@ export async function createOffre(
   }
 }
 
-/**
- * Activate/Deactivate offers
- * PATCH /api/offres/{id}/toggle-status
- */
+export async function updateOffre(
+  offreId: number,
+  offre: Partial<Omit<OffreDTO, "id" | "active" | "createdAt" | "disabledByAdmin">>
+): Promise<OffreDTO> {
+  const token = localStorage.getItem("authToken");
+  if (!token) throw new Error("You must be logged in");
+  try {
+    const response = await fetch(`${API_BASE_URL}/offres/${offreId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(offre),
+    });
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || "Failed to update offre");
+    }
+    return await response.json();
+  } catch (err) {
+    console.error("updateOffre failed", err);
+    throw err;
+  }
+}
+
 export async function toggleOffreStatus(offreId: number): Promise<OffreDTO> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/offres/${offreId}/toggle-status`, {
       method: "PATCH",
       headers: { Authorization: `Bearer ${token}` },
     });
-
     if (!response.ok) {
       const msg = await response.text();
       throw new Error(msg || "Failed to toggle offer status");
     }
-
     return await response.json();
   } catch (err) {
     console.error("toggleOffreStatus failed", err);
@@ -596,7 +563,6 @@ export async function toggleOffreStatus(offreId: number): Promise<OffreDTO> {
 export async function setOffreActive(offreId: number, active: boolean): Promise<OffreDTO> {
   const token = localStorage.getItem("authToken");
   if (!token) throw new Error("You must be logged in");
-
   try {
     const response = await fetch(`${API_BASE_URL}/offres/${offreId}/set-active`, {
       method: "PATCH",
@@ -606,15 +572,103 @@ export async function setOffreActive(offreId: number, active: boolean): Promise<
       },
       body: JSON.stringify({ active }),
     });
-
     if (!response.ok) {
       const msg = await response.text();
       throw new Error(msg || "Failed to set offer active flag");
     }
-
     return await response.json();
   } catch (err) {
     console.error("setOffreActive failed", err);
     throw err;
   }
+}
+
+// ========================================
+// TICKETS TYPES & FUNCTIONS
+// ========================================
+
+export interface TicketDTO {
+  id: number;
+  subject: string;
+  status: 'OPEN' | 'CLOSED';
+  createdAt: string;
+  closedAt: string | null;
+  recruiterId: number;
+  recruiterNom: string;
+  recruiterPrenom: string;
+  recruiterEmail: string;
+}
+
+export interface TicketMessageDTO {
+  id: number;
+  content: string;
+  senderId: number;
+  senderNom: string;
+  senderPrenom: string;
+  sentAt: string;
+}
+
+export async function createTicket(subject: string): Promise<TicketDTO> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('You must be logged in');
+  const response = await fetch(`${API_BASE_URL}/tickets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ subject }),
+  });
+  if (!response.ok) throw new Error('Failed to create ticket');
+  return await response.json();
+}
+
+export async function getMyTickets(): Promise<TicketDTO[]> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('You must be logged in');
+  const response = await fetch(`${API_BASE_URL}/tickets/my`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch tickets');
+  return await response.json();
+}
+
+export async function getAllTickets(): Promise<TicketDTO[]> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('You must be logged in');
+  const response = await fetch(`${API_BASE_URL}/tickets/all`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch tickets');
+  return await response.json();
+}
+
+export async function getTicketMessages(ticketId: number): Promise<TicketMessageDTO[]> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('You must be logged in');
+  const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/messages`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to fetch messages');
+  return await response.json();
+}
+
+export async function sendTicketMessage(ticketId: number, content: string): Promise<TicketMessageDTO> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('You must be logged in');
+  const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ content }),
+  });
+  if (!response.ok) throw new Error('Failed to send message');
+  return await response.json();
+}
+
+export async function closeTicket(ticketId: number): Promise<TicketDTO> {
+  const token = localStorage.getItem('authToken');
+  if (!token) throw new Error('You must be logged in');
+  const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/close`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error('Failed to close ticket');
+  return await response.json();
 }

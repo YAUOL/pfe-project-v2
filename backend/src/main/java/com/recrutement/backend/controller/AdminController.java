@@ -1,6 +1,7 @@
 package com.recrutement.backend.controller;
 
 import com.recrutement.backend.model.Offre;
+import com.recrutement.backend.model.Role;
 import com.recrutement.backend.model.Utilisateur;
 import com.recrutement.backend.service.OffreService;
 import com.recrutement.backend.service.UtilisateurService;
@@ -80,5 +81,22 @@ public class AdminController {
         stats.put("totalOffres", offres.size());
 
         return ResponseEntity.ok(stats);
+    }
+
+    // ── Returns the first admin's ID so recruiter knows who to message ──
+    @GetMapping("/admin-id")
+    public ResponseEntity<?> getAdminId() {
+        return utilisateurService.getAllUtilisateurs()
+                .stream()
+                .filter(u -> u.getRole() == Role.ADMIN)
+                .findFirst()
+                .map(u -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", u.getId());
+                    map.put("nom", u.getNom());
+                    map.put("prenom", u.getPrenom() != null ? u.getPrenom() : "");
+                    return ResponseEntity.ok((Object) map);
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 }

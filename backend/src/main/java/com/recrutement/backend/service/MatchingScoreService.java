@@ -38,7 +38,6 @@ public class MatchingScoreService {
 
         Offre offre = cv.getOffre();
 
-        // ✅ CORRECTION : findFirstByCvAndOffre
         Optional<MatchingScore> existing = matchingScoreRepository.findFirstByCvAndOffre(cv, offre);
         if (existing.isPresent()) {
             System.out.println("[MATCHING] Score already exists for CV " + cvId);
@@ -61,7 +60,11 @@ public class MatchingScoreService {
 
             String jsonBody = objectMapper.writeValueAsString(requestBody);
 
-            HttpClient client = HttpClient.newHttpClient();
+            // ✅ FIXED: force HTTP/1.1 — uvicorn does not support HTTP/2 upgrades
+            HttpClient client = HttpClient.newBuilder()
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .build();
+
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(aiServiceUrl + "/api/match"))
                     .header("Content-Type", "application/json")
@@ -73,8 +76,12 @@ public class MatchingScoreService {
                     HttpResponse.BodyHandlers.ofString()
             );
 
+            System.out.println("[MATCHING] AI response status: " + response.statusCode());
+            System.out.println("[MATCHING] AI response body: " + response.body());
+
             if (response.statusCode() != 200) {
-                throw new RuntimeException("AI service returned: " + response.statusCode());
+                throw new RuntimeException("AI service returned: " + response.statusCode()
+                        + " — " + response.body());
             }
 
             Map<?, ?> responseMap = objectMapper.readValue(response.body(), Map.class);
@@ -105,7 +112,7 @@ public class MatchingScoreService {
             return saved;
 
         } catch (Exception e) {
-            System.err.println("[MATCHING] AI service error: " + e.getMessage());
+            System.err.println("[MATCHING] ❌ AI service error: " + e.getMessage());
             System.out.println("[MATCHING] Falling back to basic matching...");
             return fallbackMatching(cv, offre);
         }
@@ -149,11 +156,9 @@ public class MatchingScoreService {
         return matchingScoreRepository.save(ms);
     }
 
-    // ✅ CORRECTION : Retourne le dernier score (highest ID)
     public Optional<MatchingScore> getScoreByCv(CV cv) {
         List<MatchingScore> scores = matchingScoreRepository.findByCv(cv);
         if (scores.isEmpty()) return Optional.empty();
-        // Return the latest score (highest id)
         return scores.stream()
                 .max(java.util.Comparator.comparing(MatchingScore::getId));
     }
@@ -162,7 +167,7 @@ public class MatchingScoreService {
         CV cv = cvRepository.findById(cvId)
                 .orElseThrow(() -> new RuntimeException("CV not found: " + cvId));
 
-        // ✅ CORRECTION : findFirstByCvAndOffre
+        // Delete existing score so calculateAndSave runs fresh
         matchingScoreRepository.findFirstByCvAndOffre(cv, cv.getOffre())
                 .ifPresent(matchingScoreRepository::delete);
 

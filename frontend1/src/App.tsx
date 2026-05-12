@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { ChatBot } from './components/ChatBot';
+import { MessagingButton } from './pages/MessagingButton';
 import { Home } from './pages/Home';
 import { JobListings } from './pages/JobListings';
 import { JobDetail } from './pages/JobDetail';
@@ -40,6 +41,8 @@ export default function App() {
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [ticketOpen, setTicketOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -48,35 +51,63 @@ export default function App() {
       setIsLoggedIn(true);
       setUserRole(role);
     }
+    window.history.replaceState({ page: 'home' }, '', '/home');
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.page) {
+        setCurrentPage(event.state.page as Page);
+        if (event.state.jobId) setSelectedJobId(event.state.jobId);
+      } else {
+        setCurrentPage('home');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const handleNavigate = (page: string, jobId?: string) => {
     if (page === 'admin-dashboard' && userRole !== 'ADMIN') {
       setCurrentPage('home');
+      window.history.pushState({ page: 'home' }, '', '/home');
       return;
     }
     setCurrentPage(page as Page);
-    if (jobId) setSelectedJobId(jobId);
+    if (jobId !== undefined) setSelectedJobId(jobId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.history.pushState({ page, jobId }, '', `/${page}`);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('authEmail');
     localStorage.removeItem('authRole');
+    localStorage.removeItem('authId');
+    localStorage.removeItem('authFullName');
     setIsLoggedIn(false);
     setUserRole(null);
     setCurrentPage('home');
+    window.history.pushState({ page: 'home' }, '', '/home');
   };
 
   const handleLoginSuccess = () => {
     const role = localStorage.getItem('authRole');
     setIsLoggedIn(true);
     setUserRole(role);
-    if (role === 'ADMIN') setCurrentPage('admin-dashboard');
-    else if (role === 'RECRUTEUR') setCurrentPage('employer-dashboard');
-    else if (role === 'CANDIDAT') setCurrentPage('candidate-dashboard');
-    else setCurrentPage('home');
+    if (role === 'ADMIN') {
+      setCurrentPage('admin-dashboard');
+      window.history.pushState({ page: 'admin-dashboard' }, '', '/admin-dashboard');
+    } else if (role === 'RECRUTEUR') {
+      setCurrentPage('employer-dashboard');
+      window.history.pushState({ page: 'employer-dashboard' }, '', '/employer-dashboard');
+    } else if (role === 'CANDIDAT') {
+      setCurrentPage('candidate-dashboard');
+      window.history.pushState({ page: 'candidate-dashboard' }, '', '/candidate-dashboard');
+    } else {
+      setCurrentPage('home');
+      window.history.pushState({ page: 'home' }, '', '/home');
+    }
   };
 
   const showNavbarAndFooter = !['login', 'signup', 'forgot-password'].includes(currentPage);
@@ -84,19 +115,22 @@ export default function App() {
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
-        return <Home onNavigate={handleNavigate} />;
+        return <Home onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} />;
       case 'job-listings':
         return <JobListings onNavigate={handleNavigate} />;
       case 'job-detail':
         return <JobDetail jobId={selectedJobId} onNavigate={handleNavigate} />;
       case 'employer-dashboard':
-        return <RecruiterDashboard onNavigate={handleNavigate} />;
+      case 'manage-jobs':
+        return <RecruiterDashboard onNavigate={handleNavigate} activePage={currentPage} />;
       case 'candidate-dashboard':
-        return <CandidateDashboard onNavigate={handleNavigate} />;
+      case 'my-applications':
+      case 'saved-jobs':
+        return <CandidateDashboard onNavigate={handleNavigate} activePage={currentPage} />;
       case 'admin-dashboard':
         return userRole === 'ADMIN'
           ? <AdminDashboard onNavigate={handleNavigate} />
-          : <Home onNavigate={handleNavigate} />;
+          : <Home onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} />;
       case 'job-application':
         return <JobApplication jobId={selectedJobId} onNavigate={handleNavigate} />;
       case 'login':
@@ -106,31 +140,14 @@ export default function App() {
       case 'forgot-password':
         return <ForgotPassword onNavigate={handleNavigate} />;
       case 'post-job':
-        return <PostJob onNavigate={handleNavigate} />;
+        return <PostJob onNavigate={handleNavigate} jobId={selectedJobId || undefined} />;
       case 'offer-candidates':
         return <OfferCandidates offerId={selectedJobId} onNavigate={handleNavigate} />;
       case 'profile':
       case 'recruiter-profile':
         return <ProfileEdit onNavigate={handleNavigate} />;
-      case 'manage-jobs':
-      case 'my-applications':
-      case 'saved-jobs':
-        return (
-          <div className="flex items-center justify-center min-h-screen bg-surface">
-            <div className="text-center p-8">
-              <h2 className="mb-4">Page Under Construction</h2>
-              <p className="text-secondary mb-6">This page is coming soon!</p>
-              <button
-                onClick={() => handleNavigate('home')}
-                className="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-lg transition-colors"
-              >
-                Back to Home
-              </button>
-            </div>
-          </div>
-        );
       default:
-        return <Home onNavigate={handleNavigate} />;
+        return <Home onNavigate={handleNavigate} isLoggedIn={isLoggedIn} userRole={userRole} />;
     }
   };
 
@@ -145,9 +162,7 @@ export default function App() {
           onLogout={handleLogout}
         />
       )}
-      <main className="flex-1">
-        {renderPage()}
-      </main>
+      <main className="flex-1">{renderPage()}</main>
       {showNavbarAndFooter && (
         <Footer
           onNavigate={handleNavigate}
@@ -155,7 +170,16 @@ export default function App() {
           userRole={userRole}
         />
       )}
-      <ChatBot />
+      <ChatBot
+        isOpen={chatOpen}
+        onToggle={(v) => { setChatOpen(v); if (v) setTicketOpen(false); }}
+      />
+      {isLoggedIn && userRole === 'RECRUTEUR' && (
+        <MessagingButton
+          isOpen={ticketOpen}
+          onToggle={(v) => { setTicketOpen(v); if (v) setChatOpen(false); }}
+        />
+      )}
     </div>
   );
 }

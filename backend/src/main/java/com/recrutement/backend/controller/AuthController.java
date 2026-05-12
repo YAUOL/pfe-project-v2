@@ -30,7 +30,6 @@ public class AuthController {
                 return ResponseEntity.status(409).body("Email already exists");
             }
 
-            // Block public ADMIN registration
             if (request.getRole() == Role.ADMIN) {
                 return ResponseEntity.status(403).body("You cannot register as ADMIN");
             }
@@ -41,7 +40,6 @@ public class AuthController {
             newUser.setNom(request.getNom());
             newUser.setPrenom(request.getPrenom());
 
-            // Allow only CANDIDAT or RECRUTEUR
             if (request.getRole() == Role.RECRUTEUR) {
                 newUser.setRole(Role.RECRUTEUR);
             } else {
@@ -49,7 +47,6 @@ public class AuthController {
             }
 
             utilisateurService.createUtilisateur(newUser);
-
             return ResponseEntity.ok("User registered successfully");
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Registration failed: " + e.getMessage());
@@ -58,7 +55,6 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-
         Optional<Utilisateur> userOpt = utilisateurService.findByEmail(request.getEmail());
 
         if (userOpt.isEmpty()) {
@@ -73,10 +69,15 @@ public class AuthController {
 
         String token = jwtService.generateToken(utilisateur.getEmail());
 
+        String fullName = (utilisateur.getPrenom() != null ? utilisateur.getPrenom() + " " : "")
+                + utilisateur.getNom();
+
         return ResponseEntity.ok(new LoginResponse(
                 token,
                 utilisateur.getEmail(),
-                utilisateur.getRole().name()
+                utilisateur.getRole().name(),
+                utilisateur.getId(),
+                fullName.trim()
         ));
     }
 }

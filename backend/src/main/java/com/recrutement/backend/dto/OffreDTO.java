@@ -1,7 +1,6 @@
 package com.recrutement.backend.dto;
 
 import lombok.Data;
-
 import java.time.LocalDateTime;
 
 @Data
@@ -18,9 +17,8 @@ public class OffreDTO {
     private Integer salaryMin;
     private Integer salaryMax;
     private boolean active;
+    private boolean disabledByAdmin;
     private LocalDateTime createdAt;
-
-    // NEW: no enum, simple String + timestamp
-    private String status;       // ACTIVE | UPDATED | CLOSED | DELETED
+    private String status;
     private LocalDateTime updatedAt;
 }

@@ -1,4 +1,4 @@
-import { Search, MapPin, Briefcase, Users, TrendingUp, Award } from 'lucide-react';
+import { Search, MapPin, Briefcase, Users, Award } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { JobCard } from '../components/JobCard';
@@ -7,9 +7,11 @@ import { useState } from 'react';
 
 interface HomeProps {
   onNavigate: (page: string, jobId?: string) => void;
+  isLoggedIn?: boolean;
+  userRole?: string | null;
 }
 
-export function Home({ onNavigate }: HomeProps) {
+export function Home({ onNavigate, isLoggedIn, userRole }: HomeProps) {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchLocation, setSearchLocation] = useState('');
 
@@ -17,6 +19,14 @@ export function Home({ onNavigate }: HomeProps) {
 
   const handleSearch = () => {
     onNavigate('job-listings');
+  };
+
+  const handlePostJob = () => {
+    if (isLoggedIn && userRole === 'RECRUTEUR') {
+      onNavigate('post-job');
+    } else {
+      onNavigate('login');
+    }
   };
 
   return (
@@ -72,7 +82,7 @@ export function Home({ onNavigate }: HomeProps) {
               Browse Jobs
             </Button>
             <Button
-              onClick={() => onNavigate('employer-dashboard')}
+              onClick={handlePostJob}
               variant="outline"
               className="border-primary text-primary hover:bg-primary-light rounded-lg px-8 py-6"
             >
@@ -121,7 +131,6 @@ export function Home({ onNavigate }: HomeProps) {
               Explore our hand-picked job opportunities from top companies
             </p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {featuredJobs.map((job) => (
               <JobCard
@@ -131,7 +140,6 @@ export function Home({ onNavigate }: HomeProps) {
               />
             ))}
           </div>
-
           <div className="text-center">
             <Button
               onClick={() => onNavigate('job-listings')}
@@ -153,7 +161,6 @@ export function Home({ onNavigate }: HomeProps) {
               Get started in just a few simple steps
             </p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4">

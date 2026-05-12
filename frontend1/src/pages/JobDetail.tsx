@@ -6,7 +6,8 @@ import {
   Building2,
   Share2,
   Bookmark,
-  ArrowLeft
+  ArrowLeft,
+  CheckCircle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -24,9 +25,13 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
   const [loading, setLoading] = useState(true);
   const [hasApplied, setHasApplied] = useState(false);
   const [checkingApplication, setCheckingApplication] = useState(true);
+  const [isSaved, setIsSaved] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     loadJobDataAndCheckApplication();
+    const saved = JSON.parse(localStorage.getItem('savedJobs') || '[]');
+    setIsSaved(saved.includes(jobId));
   }, [jobId]);
 
   const loadJobDataAndCheckApplication = async () => {
@@ -36,7 +41,6 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
       setHasApplied(false);
 
       const offres = await getAllOffres();
-
       const currentJob = offres.find(o => o.id.toString() === jobId);
       setJob(currentJob || null);
 
@@ -48,17 +52,16 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
               (o.category === currentJob.category || o.typeContrat === currentJob.typeContrat)
           )
           .slice(0, 3);
-
         setRelatedJobs(similar);
       } else {
         setRelatedJobs([]);
       }
 
-      // Check if logged-in candidate already applied
       const token = localStorage.getItem('authToken');
-      const role = localStorage.getItem('authRole');
+      const r = (localStorage.getItem('authRole') || '').toUpperCase();
+      const isCandidateRole = r === 'CANDIDAT';
 
-      if (token && role === 'CANDIDAT' && currentJob) {
+      if (token && isCandidateRole && currentJob) {
         try {
           const mesCVs: CVDTO[] = await getMesCVs();
           const alreadyApplied = mesCVs.some(cv => cv.offre.id.toString() === jobId);
@@ -73,6 +76,33 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
     } finally {
       setLoading(false);
       setCheckingApplication(false);
+    }
+  };
+
+  const handleSaveJob = () => {
+    const saved: string[] = JSON.parse(localStorage.getItem('savedJobs') || '[]');
+    const updated = isSaved
+      ? saved.filter(id => id !== jobId)
+      : [...saved, jobId];
+    localStorage.setItem('savedJobs', JSON.stringify(updated));
+    setIsSaved(!isSaved);
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = job?.titre ?? 'Job Offer';
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+      } catch (_) {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2500);
+      } catch (_) {
+        alert('Could not copy link. Please copy the URL from your address bar.');
+      }
     }
   };
 
@@ -102,7 +132,12 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
     ? job.competencesRequises.split(',').map(skill => skill.trim()).filter(Boolean)
     : [];
 
-  const isCandidate = localStorage.getItem('authRole') === 'CANDIDAT';
+  // Role and permissions (Option B: only candidates can apply)
+  const userRole = (localStorage.getItem('authRole') || '').toUpperCase();
+  const isCandidate = userRole === 'CANDIDAT';
+  const isAdmin = userRole === 'ADMIN' || userRole === 'ADMINISTRATEUR';
+  const isRecruiter = userRole === 'RECRUITER' || userRole === 'RECRUTEUR';
+  const canApply = isCandidate; // only candidates can apply
   const isLoggedIn = !!localStorage.getItem('authToken');
 
   return (
@@ -128,7 +163,6 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
                     <span className="text-lg font-medium">{job.company}</span>
                   </div>
                 </div>
-
                 {job.active && (
                   <Badge className="bg-primary-light text-primary border-0">
                     Featured
@@ -156,7 +190,8 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                {isCandidate ? (
+                {/* Apply / Recruiter/Admin / Login button */}
+                {canApply ? (
                   <Button
                     onClick={() => onNavigate('job-application', jobId)}
                     disabled={hasApplied || checkingApplication}
@@ -165,15 +200,19 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
                     {checkingApplication
                       ? 'Checking...'
                       : hasApplied
-                        ? 'Already Applied'
+                        ? '✓ Already Applied'
                         : 'Apply Now'}
                   </Button>
                 ) : isLoggedIn ? (
                   <Button
                     disabled
-                    className="flex-1 bg-gray-400 text-white rounded-lg py-6 cursor-not-allowed"
+                    className="flex-1 bg-primary text-white rounded-lg py-6 opacity-50 cursor-not-allowed"
                   >
-                    Recruiters cannot apply
+                    {isRecruiter
+                      ? '🚫 Recruiters cannot apply'
+                      : isAdmin
+                        ? '🚫 Admins cannot apply'
+                        : '🚫 Only candidates can apply'}
                   </Button>
                 ) : (
                   <Button
@@ -184,20 +223,49 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
                   </Button>
                 )}
 
+                {/* Save Job */}
                 <Button
                   variant="outline"
-                  className="rounded-lg border-color hover:bg-primary-light hover:border-primary"
+                  onClick={handleSaveJob}
+                  className={`rounded-lg transition-all ${
+                    isSaved
+                      ? 'bg-primary text-white border-primary hover:bg-primary-hover'
+                      : 'border-color hover:bg-primary-light hover:border-primary'
+                  }`}
                 >
-                  <Bookmark className="h-5 w-5 mr-2" />
-                  Save Job
+                  <Bookmark
+                    className="h-5 w-5 mr-2"
+                    fill={isSaved ? 'currentColor' : 'none'}
+                  />
+                  {isSaved ? 'Saved' : 'Save Job'}
                 </Button>
-                <Button
-                  variant="outline"
-                  className="rounded-lg border-color hover:bg-primary-light hover:border-primary"
-                >
-                  <Share2 className="h-5 w-5 mr-2" />
-                  Share
-                </Button>
+
+                {/* Share */}
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    onClick={handleShare}
+                    className="rounded-lg border-color hover:bg-primary-light hover:border-primary"
+                  >
+                    {shareCopied ? (
+                      <>
+                        <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                        <span className="text-green-600">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="h-5 w-5 mr-2" />
+                        Share
+                      </>
+                    )}
+                  </Button>
+                  {shareCopied && (
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+                      Link copied to clipboard!
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {hasApplied && isCandidate && (
@@ -233,6 +301,7 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
             </div>
           </div>
 
+          {/* Sidebar */}
           <div className="space-y-6">
             <div className="bg-white rounded-xl border border-color p-6">
               <h3 className="mb-4">About Company</h3>
@@ -287,6 +356,7 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
           </div>
         </div>
 
+        {/* Related Jobs */}
         {relatedJobs.length > 0 && (
           <div className="mt-12">
             <h2 className="mb-6">Related Jobs</h2>
@@ -307,10 +377,12 @@ export function JobDetail({ jobId, onNavigate }: JobDetailProps) {
                     ${relatedJob.salaryMin}k - ${relatedJob.salaryMax}k
                   </p>
                   <Button
-                    className="w-full mt-4 bg-primary hover:bg-primary-hover text-white rounded-lg"
+                    className="w-full mt-4 bg-primary hover:bg-primary-hover text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!canApply && isLoggedIn}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onNavigate('job-application', relatedJob.id.toString());
+                      if (!isLoggedIn) return onNavigate('login');
+                      if (canApply) onNavigate('job-application', relatedJob.id.toString());
                     }}
                   >
                     Apply Now

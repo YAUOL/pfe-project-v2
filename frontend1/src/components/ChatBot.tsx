@@ -6,6 +6,11 @@ interface Message {
   content: string;
 }
 
+interface ChatBotProps {
+  isOpen: boolean;
+  onToggle: (v: boolean) => void;
+}
+
 function formatMessage(text: string): string {
   return text
     .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #e5e9eb;margin:10px 0"/>')
@@ -19,8 +24,19 @@ function formatMessage(text: string): string {
     .replace(/\n/g, '<br/>');
 }
 
-export function ChatBot() {
-  const [isOpen, setIsOpen] = useState(false);
+const REPORT_KEYWORDS = [
+  'report', 'problem', 'issue', 'bug', 'complaint', 'support',
+  'contact admin', 'report a problem', 'something wrong', 'not working',
+  'broken', 'error', 'wrong', 'help me', 'need help', 'ticket',
+  'signaler', 'problème', 'probleme', 'aide'
+];
+
+const isReportIntent = (text: string): boolean => {
+  const lower = text.toLowerCase();
+  return REPORT_KEYWORDS.some(k => lower.includes(k));
+};
+
+export function ChatBot({ isOpen, onToggle }: ChatBotProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -51,6 +67,15 @@ export function ChatBot() {
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInput('');
+
+    if (isReportIntent(userMessage.content)) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "⚠️ It looks like you want to report a problem or contact support.\n\nPlease use the 🔔 <strong>orange button</strong> at the bottom right of the screen to open a support ticket and send a message directly to the admin."
+      }]);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -93,8 +118,6 @@ export function ChatBot() {
           boxShadow: '0 20px 40px rgba(0,0,0,0.12)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden'
         }}>
-
-          {/* Header */}
           <div style={{ backgroundColor: '#1a73e8', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '32px', height: '32px', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -108,16 +131,12 @@ export function ChatBot() {
                 </div>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.8)' }}
-            >
+            <button type="button" onClick={() => onToggle(false)}
+              style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.8)' }}>
               <X style={{ width: '16px', height: '16px' }} />
             </button>
           </div>
 
-          {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#f8fafb' }}>
             <style>{`
               @keyframes bounce {
@@ -150,18 +169,13 @@ export function ChatBot() {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                     border: msg.role === 'assistant' ? '1px solid #e5e9eb' : 'none'
                   }}
-                  dangerouslySetInnerHTML={
-                    msg.role === 'assistant'
-                      ? { __html: formatMessage(msg.content) }
-                      : undefined
-                  }
+                  dangerouslySetInnerHTML={msg.role === 'assistant' ? { __html: formatMessage(msg.content) } : undefined}
                 >
                   {msg.role === 'user' ? msg.content : undefined}
                 </div>
               </div>
             ))}
 
-            {/* Bouncing dots loader */}
             {loading && (
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#1a73e8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -174,11 +188,9 @@ export function ChatBot() {
                 </div>
               </div>
             )}
-
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
           <div style={{ padding: '12px', borderTop: '1px solid #e5e9eb', backgroundColor: '#ffffff' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#f8fafb', border: '1px solid #e5e9eb', borderRadius: '12px', padding: '8px 12px' }}>
               <input
@@ -190,18 +202,14 @@ export function ChatBot() {
                 placeholder="Ask something..."
                 style={{ flex: 1, backgroundColor: 'transparent', border: 'none', outline: 'none', fontSize: '13px', color: '#1f2937' }}
               />
-              <button
-                type="button"
-                onClick={sendMessage}
-                disabled={!input.trim() || loading}
+              <button type="button" onClick={sendMessage} disabled={!input.trim() || loading}
                 style={{
                   width: '30px', height: '30px', borderRadius: '8px',
                   backgroundColor: !input.trim() || loading ? '#e5e9eb' : '#1a73e8',
                   border: 'none', cursor: !input.trim() || loading ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0, transition: 'background-color 0.15s'
-                }}
-              >
+                }}>
                 <Send style={{ width: '14px', height: '14px', color: !input.trim() || loading ? '#9ca3af' : '#ffffff' }} />
               </button>
             </div>
@@ -209,10 +217,7 @@ export function ChatBot() {
         </div>
       )}
 
-      {/* Floating Button */}
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
+      <button type="button" onClick={() => onToggle(!isOpen)}
         style={{
           width: '56px', height: '56px', borderRadius: '50%',
           backgroundColor: '#1a73e8', border: 'none', cursor: 'pointer',

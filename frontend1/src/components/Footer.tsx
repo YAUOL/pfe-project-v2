@@ -64,16 +64,6 @@ export function Footer({ onNavigate, isLoggedIn, userRole }: FooterProps) {
                 </button>
               </li>
               <li>
-                <button type="button" disabled={candidateLocked} onClick={() => !candidateLocked && go('home')} className={candidateLocked ? locked : active}>
-                  Career Advice
-                </button>
-              </li>
-              <li>
-                <button type="button" disabled={candidateLocked} onClick={() => !candidateLocked && go(isCandidate ? 'profile' : 'login')} className={candidateLocked ? locked : active}>
-                  Resume Tips
-                </button>
-              </li>
-              <li>
                 <button type="button" disabled={candidateLocked} onClick={() => !candidateLocked && go(isCandidate ? 'saved-jobs' : 'login')} className={candidateLocked ? locked : active}>
                   Saved Jobs
                 </button>
@@ -96,11 +86,6 @@ export function Footer({ onNavigate, isLoggedIn, userRole }: FooterProps) {
                 </button>
               </li>
               <li>
-                <button type="button" disabled={recruiterLocked} onClick={() => !recruiterLocked && go('home')} className={recruiterLocked ? locked : active}>
-                  Pricing Plans
-                </button>
-              </li>
-              <li>
                 <button type="button" disabled={recruiterLocked} onClick={() => !recruiterLocked && go(isRecruiter ? 'employer-dashboard' : 'login')} className={recruiterLocked ? locked : active}>
                   Company Dashboard
                 </button>
@@ -120,7 +105,7 @@ export function Footer({ onNavigate, isLoggedIn, userRole }: FooterProps) {
               </li>
               <li className="flex items-start">
                 <Phone className="h-5 w-5 text-primary mr-2 mt-0.5 shrink-0" />
-                <a href="tel:+15551234567" className="text-secondary hover:text-primary transition-colors">
+                <a href="tel:+21673325001" className="text-secondary hover:text-primary transition-colors">
                   73325001
                 </a>
               </li>

@@ -1,13 +1,6 @@
 import {
-  LayoutDashboard,
-  Briefcase,
-  FileText,
-  User,
-  PlusCircle,
-  Bookmark,
-  Menu,
-  X,
-  Users,
+  LayoutDashboard, Briefcase, FileText, User,
+  PlusCircle, Bookmark, Menu, X, Users, MessageSquare,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -44,7 +37,9 @@ export function DashboardSidebar({
 
   const adminMenuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: 'admin-dashboard', sectionId: 'admin-dashboard-overview' },
-    { icon: Users, label: 'Users Management', path: 'admin-dashboard', sectionId: 'users-management' },
+    { icon: MessageSquare, label: 'Messages', path: 'admin-dashboard', sectionId: 'messages-section' },
+    { icon: Users, label: 'Candidates', path: 'admin-dashboard', sectionId: 'candidates-section' },
+    { icon: Briefcase, label: 'Recruiters', path: 'admin-dashboard', sectionId: 'recruiters-section' },
     { icon: Briefcase, label: 'Offers Management', path: 'admin-dashboard', sectionId: 'offers-management' },
   ];
 
@@ -54,34 +49,39 @@ export function DashboardSidebar({
     ? adminMenuItems
     : candidateMenuItems;
 
-  const portalLabel = isAdmin
-    ? 'Admin Portal'
-    : isRecruiter
-    ? 'Recruiter Portal'
-    : 'Candidate Portal';
-
+  const portalLabel = isAdmin ? 'Admin Portal' : isRecruiter ? 'Recruiter Portal' : 'Candidate Portal';
   const portalInitials = isAdmin ? 'AD' : 'JB';
 
   const handleItemClick = (path: string, sectionId: string) => {
     setMobileMenuOpen(false);
     onNavigate(path);
-
-    // after navigation, scroll to the section
     setTimeout(() => {
       if (sectionId) {
         const el = document.getElementById(sectionId);
         if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // Scroll inside the admin main container, not the page
+          const container = document.getElementById('admin-main');
+          if (container) {
+            const offsetTop = el.offsetTop - 24;
+            container.scrollTo({ top: offsetTop, behavior: 'smooth' });
+          } else {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
         }
       } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const container = document.getElementById('admin-main');
+        if (container) {
+          container.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
       }
     }, 100);
   };
 
   const SidebarContent = () => (
-    <>
-      <div className="p-6 border-b border-color">
+    <div className="flex flex-col h-full">
+      <div className="p-6 border-b border-color shrink-0">
         <div className="flex items-center">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center mr-3">
             <span className="text-white font-bold">{portalInitials}</span>
@@ -93,12 +93,11 @@ export function DashboardSidebar({
         </div>
       </div>
 
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-2">
           {menuItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = activePage === item.path;
-
             return (
               <li key={`${item.path}-${index}`}>
                 <button
@@ -110,7 +109,7 @@ export function DashboardSidebar({
                       : 'text-secondary hover:bg-surface hover:text-primary'
                   }`}
                 >
-                  <Icon className="h-5 w-5 mr-3" />
+                  <Icon className="h-5 w-5 mr-3 shrink-0" />
                   {item.label}
                 </button>
               </li>
@@ -118,7 +117,7 @@ export function DashboardSidebar({
           })}
         </ul>
       </nav>
-    </>
+    </div>
   );
 
   return (
@@ -135,8 +134,8 @@ export function DashboardSidebar({
         )}
       </button>
 
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex lg:flex-col w-64 bg-white border-r border-color h-screen sticky top-0">
+      {/* Desktop sidebar — fixed height, no overflow on the aside itself */}
+      <aside className="hidden lg:block w-64 bg-white border-r border-color shrink-0" style={{ height: '100vh', position: 'sticky', top: 0 }}>
         <SidebarContent />
       </aside>
 
@@ -147,7 +146,7 @@ export function DashboardSidebar({
             className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <aside className="lg:hidden fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-color z-50 flex flex-col">
+          <aside className="lg:hidden fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-color z-50">
             <SidebarContent />
           </aside>
         </>

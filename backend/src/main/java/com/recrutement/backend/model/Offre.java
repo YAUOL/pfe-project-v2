@@ -40,11 +40,9 @@ public class Offre {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    // NEW: track last change (no enum/class added)
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // NEW: textual state: ACTIVE | UPDATED | CLOSED | DELETED
     @Column(name = "status", length = 20, nullable = false)
     private String status;
 
@@ -63,6 +61,10 @@ public class Offre {
     @Column(name = "salary_max", nullable = false)
     private Integer salaryMax;
 
+    @Builder.Default
+    @Column(name = "disabled_by_admin", nullable = false)
+    private boolean disabledByAdmin = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recruteur_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "password"})
@@ -78,24 +80,12 @@ public class Offre {
 
     @PrePersist
     protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-        if (updatedAt == null) {
-            updatedAt = createdAt;
-        }
-        if (active == null) {
-            active = true;
-        }
-        if (status == null) {
-            status = "ACTIVE";
-        }
-        if (cvs == null) {
-            cvs = new ArrayList<>();
-        }
-        if (matchingScores == null) {
-            matchingScores = new ArrayList<>();
-        }
+        if (createdAt == null) createdAt = LocalDateTime.now();
+        if (updatedAt == null) updatedAt = createdAt;
+        if (active == null) active = true;
+        if (status == null) status = "ACTIVE";
+        if (cvs == null) cvs = new ArrayList<>();
+        if (matchingScores == null) matchingScores = new ArrayList<>();
     }
 
     @PreUpdate
